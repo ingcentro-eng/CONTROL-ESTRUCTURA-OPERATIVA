@@ -16,7 +16,7 @@ URL_GOOGLE_DRIVE_DEFAULT = "https://docs.google.com/spreadsheets/d/1e80JLTk3YW7c
 # 2. CONFIGURACIÓN DE PÁGINA Y ESTILOS EJECUTIVOS
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Control Operativo BOL | Seguimiento Integral",
+    page_title="Control Estructura Operativa BOL ZC ZN | Seguimiento Integral",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
