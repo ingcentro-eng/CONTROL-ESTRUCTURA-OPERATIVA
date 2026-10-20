@@ -266,7 +266,7 @@ with st.sidebar:
     st.markdown("**3. Filtros de Gestión**")
     
     # Filtro Fecha
-    fechas_disp = ["Todas"] + sorted([f for f in df_raw['Fecha'].dropna().unique()])
+    fechas_disp = ["Todas"] + sorted([str(f) for f in df_raw['Fecha'].dropna().unique() if str(f).strip()])
     sel_fecha = st.selectbox("Fecha:", fechas_disp)
     
     df_filtered = df_raw.copy()
@@ -274,24 +274,22 @@ with st.sidebar:
         df_filtered = df_filtered[df_filtered['Fecha'] == sel_fecha]
 
     # Filtro Sector
-    sectores_disp = ["Todos"] + sorted(list(df_filtered['Sector'].unique()))
+    sectores_disp = ["Todos"] + sorted([str(s) for s in df_filtered['Sector'].dropna().unique() if str(s).strip()])
     sel_sector = st.selectbox("Sector:", sectores_disp)
     if sel_sector != "Todos":
         df_filtered = df_filtered[df_filtered['Sector'] == sel_sector]
         
-    # Filtro Recurso (Cuadrilla)
-    recursos_disp = ["Todos"] + sorted(list(df_filtered['Recurso'].unique()))
+    # Filtro Recurso (Cuadrilla BOL)
+    recursos_disp = ["Todos"] + sorted([str(r) for r in df_filtered['Recurso'].dropna().unique() if str(r).strip()])
     sel_recurso = st.selectbox("Recurso / Cuadrilla BOL:", recursos_disp)
     if sel_recurso != "Todos":
         df_filtered = df_filtered[df_filtered['Recurso'] == sel_recurso]
         
     # Filtro Estado
-    estados_disp = ["Todos"] + sorted(list(df_filtered['Estado_Actividad'].unique()))
+    estados_disp = ["Todos"] + sorted([str(e) for e in df_filtered['Estado_Actividad'].dropna().unique() if str(e).strip()])
     sel_estado = st.selectbox("Estado de Actividad:", estados_disp)
     if sel_estado != "Todos":
         df_filtered = df_filtered[df_filtered['Estado_Actividad'] == sel_estado]
-
-
 # -----------------------------------------------------------------------------
 # TABLERO PRINCIPAL: MÉTRICAS EJECUTIVAS (SCORECARD)
 # -----------------------------------------------------------------------------
