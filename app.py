@@ -10,7 +10,7 @@ import requests
 # -----------------------------------------------------------------------------
 # 1. CONFIGURACIÓN DEL ENLACE DE GOOGLE DRIVE (PEGA AQUÍ TU URL CORPORATIVO)
 # -----------------------------------------------------------------------------
-URL_GOOGLE_DRIVE_DEFAULT = "https://drive.google.com/file/d/TU_ID_DE_ARCHIVO/view?usp=sharing"
+URL_GOOGLE_DRIVE_DEFAULT = "https://docs.google.com/spreadsheets/d/1e80JLTk3YW7c6yxNwiMXq7_5XtpvGd9s/edit?usp=sharing&ouid=116051950038931432257&rtpof=true&sd=true"
 
 # -----------------------------------------------------------------------------
 # 2. CONFIGURACIÓN DE PÁGINA Y ESTILOS EJECUTIVOS
