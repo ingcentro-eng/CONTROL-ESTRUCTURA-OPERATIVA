@@ -1019,23 +1019,41 @@ with tab_mapa:
     df_map = df_f.dropna(subset=['Lat', 'Lon']).copy()
     
     if not df_map.empty:
-        fig_map = px.scatter_mapbox(
-            df_map,
-            lat='Lat',
-            lon='Lon',
-            color='Estado_Actividad',
-            hover_name='Recurso',
-            hover_data=['Zona_Oficial', 'Subtipo_Actividad', 'Minutos_Viaje', 'Minutos_Duracion', 'Observaciones'],
-            color_discrete_map={
-                'Finalizada': '#10b981',
-                'Cancelada': '#ef4444',
-                'Suspendida': '#f59e0b',
-                'No realizado': '#64748b'
-            },
-            zoom=8.5,
-            height=520
-        )
-        fig_map.update_layout(mapbox_style="open-street-map", margin=dict(t=0, b=0, l=0, r=0))
+        color_map_estados = {
+            'Finalizada': '#10b981',
+            'Cancelada': '#ef4444',
+            'Suspendida': '#f59e0b',
+            'No realizado': '#64748b'
+        }
+        
+        # Compatibilidad automática entre Plotly 5 (scatter_mapbox) y Plotly 6+ (scatter_map)
+        if hasattr(px, "scatter_map"):
+            fig_map = px.scatter_map(
+                df_map,
+                lat='Lat',
+                lon='Lon',
+                color='Estado_Actividad',
+                hover_name='Recurso',
+                hover_data=['Zona_Oficial', 'Subtipo_Actividad', 'Minutos_Viaje', 'Minutos_Duracion', 'Observaciones'],
+                color_discrete_map=color_map_estados,
+                zoom=8.5,
+                height=520
+            )
+            fig_map.update_layout(map_style="open-street-map", margin=dict(t=0, b=0, l=0, r=0))
+        else:
+            fig_map = px.scatter_mapbox(
+                df_map,
+                lat='Lat',
+                lon='Lon',
+                color='Estado_Actividad',
+                hover_name='Recurso',
+                hover_data=['Zona_Oficial', 'Subtipo_Actividad', 'Minutos_Viaje', 'Minutos_Duracion', 'Observaciones'],
+                color_discrete_map=color_map_estados,
+                zoom=8.5,
+                height=520
+            )
+            fig_map.update_layout(mapbox_style="open-street-map", margin=dict(t=0, b=0, l=0, r=0))
+            
         st.plotly_chart(fig_map, use_container_width=True)
     else:
         st.info("No se encontraron coordenadas geográficas válidas ('lat:...,lng:...') en los registros filtrados.")
