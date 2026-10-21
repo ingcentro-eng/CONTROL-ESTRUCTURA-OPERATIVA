@@ -259,10 +259,7 @@ def normalize_recurso_key(recurso_str: str) -> str:
 
 
 def get_shift_profile(recurso_base: str):
-    """
-    Retorna la regla de horario oficial de cada brigada:
-    (descripcion_horario, tipo_turno, min_inicio_fijo, min_fin_fijo, horas_netas_turno)
-    """
+    """Retorna la regla de horario oficial de cada brigada."""
     if recurso_base in BOLE_ESPECIALES:
         return ("L-V 07:30-16:30 (Enlace CELSIA)", "FIJO_BOLE", 7*60+30, 16*60+30, 8.0)
     if recurso_base == "BOLV-398":
@@ -406,12 +403,17 @@ def classify_cancelacion(row):
 
 
 def extract_nodes_preserve_exact(row):
+    """
+    Extrae nodos/equipos que empiezan por 6, PF, RB, RC, CD o S tal cual fueron escritos,
+    incluyendo también la columna 'Numero_Descargo'.
+    """
     textos = [
         str(row.get('Observaciones', '')),
         str(row.get('Comentarios_Suspension', '')),
         str(row.get('Comentarios_No_Realizado', '')),
         str(row.get('Comentarios_Cancelacion', '')),
-        str(row.get('Descripcion_Orden', ''))
+        str(row.get('Descripcion_Orden', '')),
+        str(row.get('Numero_Descargo', ''))
     ]
     full_text = " ".join([t for t in textos if t and t != 'nan']).upper()
     if not full_text.strip():
@@ -436,8 +438,7 @@ def classify_node_type(node_code: str) -> str:
 
 def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
     """
-    Estandariza columnas, asigna zonas y calcula con corte exacto (0 minutos de holgura)
-    todo tiempo dentro de jornada vs tiempo extendido / post-turno (horas extras).
+    Estandariza columnas, asigna zonas, calcula tiempos en cola EGAM, Gantt y corte exacto post-turno.
     """
     if df.empty:
         return df
@@ -458,7 +459,9 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
         'Comentarios de Cancelación': 'Comentarios_Cancelacion',
         'Comentarios de Suspensión': 'Comentarios_Suspension',
         'Comentarios No Realizado': 'Comentarios_No_Realizado',
+        'Fecha de Generación': 'Fecha_Generacion',
         'Hora de asignación de actividad': 'Hora_Asignacion',
+        'Número de Descargo': 'Numero_Descargo',
         'Ubicación Inicio Actividad': 'Ubicacion_Inicio',
         'Ubicación Completado': 'Ubicacion_Fin'
     }
@@ -532,6 +535,35 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
     df['Ini_Min_Dia'] = df['Inicio'].apply(hour_str_to_min_of_day) if 'Inicio' in df.columns else np.nan
     df['Fin_Min_Dia'] = df['Finalización'].apply(hour_str_to_min_of_day) if 'Finalización' in df.columns else np.nan
 
+    # Construcción de Datetimes exactos para el Diagrama de Gantt (Timeline)
+    if 'Inicio' in df.columns and 'Finalización' in df.columns:
+        dt_ini_s = pd.to_datetime(df['Fecha_Str'] + ' ' + df['Inicio'].fillna('').astype(str).str.strip(), errors='coerce')
+        dt_fin_s = pd.to_datetime(df['Fecha_Str'] + ' ' + df['Finalización'].fillna('').astype(str).str.strip(), errors='coerce')
+        # Si Finalización es menor o igual a Inicio, ajustar (cruza medianoche o dura 1 min visual)
+        dt_fin_adj = np.where(
+            (dt_fin_s.notna()) & (dt_ini_s.notna()) & (dt_fin_s < dt_ini_s),
+            dt_fin_s + pd.Timedelta(days=1),
+            np.where(
+                (dt_fin_s.notna()) & (dt_ini_s.notna()) & (dt_fin_s == dt_ini_s),
+                dt_fin_s + pd.Timedelta(minutes=2),
+                dt_fin_s
+            )
+        )
+        df['DT_Inicio'] = pd.to_datetime(dt_ini_s)
+        df['DT_Fin'] = pd.to_datetime(dt_fin_adj)
+    else:
+        df['DT_Inicio'] = pd.NaT
+        df['DT_Fin'] = pd.NaT
+
+    # Mejora A: Tiempo en Cola EGAM / Despacho (Fecha_Generacion -> Hora_Asignacion)
+    if 'Fecha_Generacion' in df.columns and 'Hora_Asignacion' in df.columns:
+        dt_gen = pd.to_datetime(df['Fecha_Generacion'], dayfirst=True, errors='coerce')
+        dt_asig = pd.to_datetime(df['Hora_Asignacion'], errors='coerce')
+        diff_cola = (dt_asig - dt_gen).dt.total_seconds() / 60.0
+        df['Minutos_Cola_EGAM'] = diff_cola.where((diff_cola >= 0) & (diff_cola <= 14400), np.nan)
+    else:
+        df['Minutos_Cola_EGAM'] = np.nan
+
     if 'Estado_Actividad' in df.columns:
         df['Estado_Actividad'] = df['Estado_Actividad'].fillna('No Definido').astype(str).str.strip().str.capitalize()
     else:
@@ -545,7 +577,7 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
         lambda x: 'Rutina / Administrativa' if str(x).upper() in ACTIVIDADES_RUTINA else 'Operativa (Daños / OT)'
     )
 
-    for c_txt in ['Observaciones', 'Comentarios_Cancelacion', 'Comentarios_Suspension', 'Comentarios_No_Realizado', 'Motivo_Cancelacion', 'Descripcion_Orden']:
+    for c_txt in ['Observaciones', 'Comentarios_Cancelacion', 'Comentarios_Suspension', 'Comentarios_No_Realizado', 'Motivo_Cancelacion', 'Descripcion_Orden', 'Numero_Descargo']:
         if c_txt not in df.columns:
             df[c_txt] = ''
         else:
@@ -579,14 +611,12 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
         for idx, r in group.iterrows():
             total_row_min = float(r['Minutos_Viaje'] + r['Minutos_Duracion'])
 
-            # Si es BOLE en Sábado o Domingo -> Todo es excepcional / extra
             if rec_b in BOLE_ESPECIALES and r['Dia_Semana_Num'] in [5, 6]:
                 df.loc[idx, 'Clasificacion_Jornada'] = "🚨 Caso Excepcional BOLE (Fin de Semana)"
                 df.loc[idx, 'Minutos_En_Jornada'] = 0.0
                 df.loc[idx, 'Minutos_Extra_PostTurno'] = total_row_min
                 continue
 
-            # Ignorar Fin Turno / Inicio Turno / Alimentación como horas extras operativas
             sub_up = str(r['Subtipo_Actividad']).upper()
             if sub_up in ["INICIO TURNO", "FIN TURNO", "ALIMENTACIÓN", "ALIMENTACION"]:
                 df.loc[idx, 'Clasificacion_Jornada'] = "En Jornada Ordinaria"
@@ -603,24 +633,19 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
                 df.loc[idx, 'Minutos_Extra_PostTurno'] = 0.0
                 continue
 
-            # Turno 3 Nocturno (22:00 a 06:00)
             if w_fin > 1440:
                 df.loc[idx, 'Clasificacion_Jornada'] = "En Jornada Ordinaria"
                 df.loc[idx, 'Minutos_En_Jornada'] = total_row_min
                 df.loc[idx, 'Minutos_Extra_PostTurno'] = 0.0
                 continue
 
-            # Regla estricta: TODO minuto después de w_fin (ej. 15:00 = 900) o antes de w_ini es Post-Turno / Extra
-            # Caso B: La actividad inicia en o después de la hora de salida (ini_m >= w_fin) o en madrugada antes del turno
             if pd.notna(ini_m) and (ini_m >= w_fin or ini_m < w_ini - 30):
                 df.loc[idx, 'Clasificacion_Jornada'] = "🌙 Caso B: Reactivación Post-Turno (Inicia Después del Turno)"
                 df.loc[idx, 'Minutos_En_Jornada'] = 0.0
                 df.loc[idx, 'Minutos_Extra_PostTurno'] = total_row_min
 
-            # Caso A: La actividad inició dentro del turno (ini_m < w_fin), pero finalizó después de la hora de salida (fin_m > w_fin)
             elif pd.notna(ini_m) and pd.notna(fin_m) and ini_m < w_fin and fin_m > w_fin:
                 df.loc[idx, 'Clasificacion_Jornada'] = "⏱️ Caso A: Tiempo Extendido (Cruza Hora Fin de Turno)"
-                # Minutos exactos después de la hora de cierre de turno
                 min_despues_cierre = float(fin_m - w_fin)
                 min_extra_calc = min(total_row_min, max(1.0, min_despues_cierre))
                 min_ord_calc = max(0.0, total_row_min - min_extra_calc)
@@ -774,8 +799,7 @@ with st.sidebar:
     
     usar_horario_oficial = st.checkbox(
         "Usar Horario Oficial específico de cada Brigada (7h / 8h según turno)",
-        value=True,
-        help="Toma automáticamente el horario de cada brigada y contabiliza como Tiempo Extendido/Post-Turno todo minuto posterior a su hora de salida."
+        value=True
     )
     
     if not usar_horario_oficial:
@@ -800,7 +824,6 @@ with st.sidebar:
     sel_fechas = multiselect_with_all("Día(s) / Fecha(s):", df_f['Fecha_Str'].unique(), "fecha")
     df_f = df_f[df_f['Fecha_Str'].isin(sel_fechas)].copy()
 
-    # NUEVO FILTRO SOLICITADO DEBAJO DE DÍA(S) / FECHA(S)
     sel_jornadas = multiselect_with_all(
         "Franja / Condición de Jornada (Ordinaria vs. Post-Turno):",
         df_f['Clasificacion_Jornada'].unique(),
@@ -865,7 +888,6 @@ prom_faena_global = df_f['Minutos_Duracion'].mean() if total_act > 0 else 0.0
 brigadas_activas = df_f['Recurso'].nunique()
 dias_unicos = df_f['Fecha_Str'].nunique()
 
-# Agrupación por Brigada
 rec_stats = df_f.groupby(['Recurso', 'Sector', 'Zona_Oficial', 'Regla_Horario', 'Horas_Netas_Turno_Base']).agg(
     Dias_Activos=('Fecha_Str', 'nunique'),
     Total_Asignadas=('ID_Actividad', 'count'),
@@ -881,7 +903,8 @@ rec_stats = df_f.groupby(['Recurso', 'Sector', 'Zona_Oficial', 'Regla_Horario', 
     Eventos_Reactivacion_B=('Clasificacion_Jornada', lambda x: (x == "🌙 Caso B: Reactivación Post-Turno (Inicia Después del Turno)").sum()),
     Prom_Viaje_Min=('Minutos_Viaje', 'mean'),
     Prom_Faena_Min=('Minutos_Duracion', 'mean'),
-    Prom_Reaccion_Min=('Minutos_Reaccion', 'mean')
+    Prom_Reaccion_Min=('Minutos_Reaccion', 'mean'),
+    Prom_Cola_EGAM_Min=('Minutos_Cola_EGAM', 'mean')
 ).reset_index()
 
 rutina_stats = df_contexto_turno.groupby('Recurso').agg(
@@ -920,15 +943,15 @@ else:
 rec_stats['Horas_En_Jornada'] = (rec_stats['Min_Ord_Ocupado'] / 60.0).round(2)
 rec_stats['Horas_Post_Turno'] = (rec_stats['Min_Post_Turno'] / 60.0).round(2)
 
-# Standby medido estrictamente dentro de su turno oficial
 rec_stats['Horas_Sin_Atender'] = (rec_stats['Horas_Netas_Disponibles'] - rec_stats['Horas_En_Jornada']).apply(lambda x: max(0.0, round(x, 2)))
 rec_stats['Prom_Viaje_Min'] = rec_stats['Prom_Viaje_Min'].round(1)
 rec_stats['Prom_Faena_Min'] = rec_stats['Prom_Faena_Min'].round(1)
 rec_stats['Prom_Reaccion_Min'] = rec_stats['Prom_Reaccion_Min'].fillna(0.0).round(1)
+rec_stats['Prom_Cola_EGAM_Min'] = rec_stats['Prom_Cola_EGAM_Min'].fillna(0.0).round(1)
 
 
 # -----------------------------------------------------------------------------
-# 9. ENCABEZADO, TARJETAS KPI Y BANNERS GEMELOS DE DIAGNÓSTICO (STANDBY + HORAS EXTRAS)
+# 9. ENCABEZADO, TARJETAS KPI Y BANNERS GEMELOS DE DIAGNÓSTICO
 # -----------------------------------------------------------------------------
 st.markdown("### ⚡ Centro de Control y Seguimiento Diario de Brigadas (BOL)")
 st.caption(
@@ -1039,7 +1062,7 @@ tab_brigadas, tab_post, tab_zonas, tab_tiempos, tab_nodos, tab_obs, tab_mapa, ta
     "👷 Control Brigadas, Standby y Extras",
     "🌙 Auditoría Post-Turno y Casco Urbano",
     "🗺️ Desempeño Zonas Oficiales",
-    "⏱️ Tiempos y Reacción",
+    "⏱️ Cola EGAM, Gantt y Disciplina WFM",
     "⚡ Nodos Recurrentes",
     "🔍 Observaciones y EGAM/RPA",
     "📍 Mapa y Trazabilidad",
@@ -1122,7 +1145,6 @@ with tab_brigadas:
         hide_index=True
     )
 
-    # Resumen directo de órdenes con tiempo extendido en la misma Pestaña 1 para visualización inmediata
     df_post_inline = df_f[df_f['Minutos_Extra_PostTurno'] > 0].copy()
     if not df_post_inline.empty:
         st.markdown("##### 🕒 Relación Directa de Actividades con Tiempo Extendido / Post-Turno (Soporte para Cliente y Horas Extras)")
@@ -1278,12 +1300,31 @@ with tab_zonas:
 
     st.dataframe(zona_summary, use_container_width=True, hide_index=True)
 
-# ================= TAB 4: TIEMPOS, REACCIÓN Y TRAZA HORARIA =================
+# ================= TAB 4: MEJORA A (COLA EGAM), MEJORA B (GANTT HORARIO) Y MEJORA C (DISCIPLINA WFM) =================
 with tab_tiempos:
+    st.markdown("##### ⏳ Mejora A: Desglose de Demora — Cola de Despacho EGAM (Generación ➔ Asignación) vs. Reacción Brigada (Asignación ➔ Inicio)")
     col_t1, col_t2 = st.columns(2)
     
     with col_t1:
-        st.markdown("##### ⚡ Tiempo Promedio de Reacción por Brigada (Asignación ➔ Inicio)")
+        cola_df = rec_stats[rec_stats['Prom_Cola_EGAM_Min'] > 0].sort_values(by='Prom_Cola_EGAM_Min', ascending=False).head(15)
+        if not cola_df.empty:
+            fig_cola = px.bar(
+                cola_df,
+                x='Prom_Cola_EGAM_Min',
+                y='Recurso',
+                color='Sector',
+                orientation='h',
+                text='Prom_Cola_EGAM_Min',
+                title="🖥️ Tiempo Promedio en Cola EGAM Antes de Asignar (Minutos)",
+                color_discrete_map={'CENTRO': '#0f172a', 'NORTE': '#2563eb'}
+            )
+            fig_cola.update_traces(texttemplate='%{text:.0f} m', textposition='outside')
+            fig_cola.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=35, b=10, l=10, r=40))
+            st.plotly_chart(fig_cola, use_container_width=True)
+        else:
+            st.info("No hay datos de Fecha de Generación vs. Asignación en la selección.")
+
+    with col_t2:
         reac_df = rec_stats[rec_stats['Prom_Reaccion_Min'] > 0].sort_values(by='Prom_Reaccion_Min', ascending=False).head(15)
         if not reac_df.empty:
             fig_reac = px.bar(
@@ -1292,33 +1333,75 @@ with tab_tiempos:
                 y='Recurso',
                 color='Zona_Oficial',
                 orientation='h',
-                text='Prom_Reaccion_Min'
+                text='Prom_Reaccion_Min',
+                title="👷 Tiempo Promedio de Reacción de Brigada tras Asignación (Minutos)"
             )
-            fig_reac.update_traces(texttemplate='%{text:.0f} min', textposition='outside')
-            fig_reac.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=10, b=10, l=10, r=40))
+            fig_reac.update_traces(texttemplate='%{text:.0f} m', textposition='outside')
+            fig_reac.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=35, b=10, l=10, r=40))
             st.plotly_chart(fig_reac, use_container_width=True)
         else:
-            st.info("No hay registros con diferencia horaria entre asignación e inicio en esta selección.")
+            st.info("No hay registros con diferencia horaria entre asignación e inicio.")
 
-    with col_t2:
-        st.markdown("##### 📊 Desglose por Tipo de Actividad (`Tipo de actividad.1`)")
-        sub_counts = df_f.groupby(['Subtipo_Actividad', 'Estado_Actividad']).size().reset_index(name='Cantidad')
-        fig_sub = px.bar(
-            sub_counts,
-            x='Cantidad',
-            y='Subtipo_Actividad',
-            color='Estado_Actividad',
-            orientation='h',
-            barmode='stack',
-            color_discrete_map={'Finalizada': '#10b981', 'Cancelada': '#ef4444', 'Suspendida': '#f59e0b', 'No realizado': '#64748b'}
+    st.markdown("---")
+    st.markdown("##### 📅 Mejora B: Diagrama de Gantt / Línea de Tiempo Horaria (Detector de Vacíos Operativos entre Orden y Orden)")
+    st.caption("Visualiza barra por barra la ocupación real de cada brigada durante el día. Los espacios en blanco entre barras representan baches sin actividad.")
+    
+    # Usar df_contexto_turno para ver tanto las operativas como Alimentación / Inicio / Fin Turno en la línea de tiempo
+    df_gantt = df_contexto_turno.dropna(subset=['DT_Inicio', 'DT_Fin']).copy()
+    if not df_gantt.empty:
+        fig_gantt = px.timeline(
+            df_gantt.sort_values(by='Recurso'),
+            x_start='DT_Inicio',
+            x_end='DT_Fin',
+            y='Recurso',
+            color='Subtipo_Actividad',
+            hover_name='Orden_Trabajo',
+            hover_data=['ID_Actividad', 'Estado_Actividad', 'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Observaciones'],
+            height=max(420, df_gantt['Recurso'].nunique() * 24)
         )
-        fig_sub.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=10, b=10, l=10, r=10))
-        st.plotly_chart(fig_sub, use_container_width=True)
+        fig_gantt.update_yaxes(autorange="reversed")
+        fig_gantt.update_layout(margin=dict(t=15, b=15, l=10, r=10))
+        st.plotly_chart(fig_gantt, use_container_width=True)
+    else:
+        st.info("No hay horas de Inicio y Finalización válidas para construir el diagrama de Gantt.")
 
-# ================= TAB 5: NODOS Y EQUIPOS RECURRENTES =================
+    st.markdown("---")
+    st.markdown("##### 🛡️ Mejora C: Auditoría de Disciplina en el Aplicativo WFM (Cierres Pendientes y Descargos)")
+    col_w1, col_w2 = st.columns(2)
+    with col_w1:
+        st.markdown("###### ⚠️ Rutinas Abiertas (`Inicio Turno`, `Alimentación` o `Fin Turno` en Estado Pendiente)")
+        rutinas_abiertas = df_contexto_turno[
+            (df_contexto_turno['Subtipo_Actividad'].str.upper().isin(['INICIO TURNO', 'FIN TURNO', 'ALIMENTACIÓN', 'ALIMENTACION'])) &
+            (df_contexto_turno['Estado_Actividad'].str.lower() != 'finalizada')
+        ]
+        if not rutinas_abiertas.empty:
+            st.dataframe(
+                rutinas_abiertas[['Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Subtipo_Actividad', 'Estado_Actividad', 'Inicio', 'Finalización']],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.success("✅ Todas las brigadas cerraron correctamente su Inicio Turno, Alimentación y Fin Turno.")
+
+    with col_w2:
+        st.markdown("###### 🚫 Auditoría de Números de Descargo Inválidos (`00000`) o Finalizadas sin Coordenadas GPS")
+        descargo_invalido = df_f[
+            (df_f['Numero_Descargo'].str.contains('^0+$', regex=True, na=False)) |
+            ((df_f['Estado_Actividad'].str.lower() == 'finalizada') & (df_f['Categoria_Labor'] == 'Operativa (Daños / OT)') & (df_f['Lat'].isna()))
+        ]
+        if not descargo_invalido.empty:
+            st.dataframe(
+                descargo_invalido[['Fecha_Str', 'Recurso', 'Orden_Trabajo', 'ID_Actividad', 'Subtipo_Actividad', 'Numero_Descargo', 'Lat', 'Observaciones']],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.success("✅ No se detectaron descargos en '00000' ni órdenes operativas finalizadas sin GPS.")
+
+# ================= TAB 5: NODOS Y EQUIPOS RECURRENTES (CON AJUSTE VISUAL SOLICITADO) =================
 with tab_nodos:
     st.markdown("##### ⚡ Detección de Nodos / Equipos Recurrentes para Visita Especializada")
-    st.caption("Códigos exactos tal cual fueron reportados que inician por **6**, **PF**, **RB**, **RC**, **CD** o **S**.")
+    st.caption("Extrae exactamente tal cual fueron reportados los códigos que inician por **6**, **PF**, **RB**, **RC**, **CD** o **S** en Observaciones, Comentarios, Descripción y Número de Descargo.")
 
     rows_nodos = []
     for idx, r in df_f.iterrows():
@@ -1333,6 +1416,7 @@ with tab_nodos:
                 'Orden_Trabajo': r['Orden_Trabajo'],
                 'ID_Actividad': r['ID_Actividad'],
                 'Estado_Actividad': r['Estado_Actividad'],
+                'Numero_Descargo': r['Numero_Descargo'],
                 'Observaciones': r['Observaciones']
             })
 
@@ -1358,7 +1442,55 @@ with tab_nodos:
             Fechas=('Fecha_Str', lambda s: ", ".join(sorted(set(s))))
         ).reset_index().sort_values(by='Veces_Intervenido', ascending=False)
 
+        # GRÁFICOS SOLICITADOS: CIRCULAR CON % (FAMILIAS) + BARRAS VERTICALES (NODO_EQUIPO EN EJE X, CANTIDAD EN EJE Y)
+        col_ng1, col_ng2 = st.columns([1, 1.35])
+        with col_ng1:
+            st.markdown("###### 📊 Distribución Porcentual por Familia (`RB/RC`, `PF/6`, `S`, `CD`)")
+            tipo_cnt = resumen_nodos.groupby('Tipo_Equipo')['Veces_Intervenido'].sum().reset_index()
+            fig_tp_nd = px.pie(
+                tipo_cnt,
+                values='Veces_Intervenido',
+                names='Tipo_Equipo',
+                hole=0.45,
+                color='Tipo_Equipo',
+                color_discrete_map={
+                    "Reconectador (RB / RC)": "#2563eb",
+                    "Cortacircuito / Transformador (CD)": "#f59e0b",
+                    "Seccionamiento (S)": "#10b981",
+                    "Punto Físico / Nodo (6 / PF)": "#7c3aed"
+                }
+            )
+            fig_tp_nd.update_traces(textposition='inside', textinfo='percent+label+value')
+            fig_tp_nd.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.15), height=390, margin=dict(t=15, b=40, l=10, r=10))
+            st.plotly_chart(fig_tp_nd, use_container_width=True)
+
+        with col_ng2:
+            st.markdown("###### 🔥 Top 20 Nodos / Equipos Recurrentes (Eje X: `Nodo_Equipo` | Eje Y: `Cantidad de Veces`)")
+            top_20_nodos = resumen_nodos.head(20)
+            fig_nodos = px.bar(
+                top_20_nodos,
+                x='Nodo_Equipo',
+                y='Veces_Intervenido',
+                color='Tipo_Equipo',
+                text='Veces_Intervenido',
+                hover_data=['Zona_Oficial', 'Brigadas_Que_Asistieron', 'Ordenes_Asociadas'],
+                labels={'Nodo_Equipo': 'Código Nodo / Equipo', 'Veces_Intervenido': 'Cantidad de Intervenciones'},
+                color_discrete_map={
+                    "Reconectador (RB / RC)": "#2563eb",
+                    "Cortacircuito / Transformador (CD)": "#f59e0b",
+                    "Seccionamiento (S)": "#10b981",
+                    "Punto Físico / Nodo (6 / PF)": "#7c3aed"
+                }
+            )
+            fig_nodos.update_traces(textposition='outside')
+            fig_nodos.update_layout(xaxis_tickangle=-45, height=390, margin=dict(t=25, b=40, l=10, r=10), legend=dict(orientation="h", y=1.12))
+            st.plotly_chart(fig_nodos, use_container_width=True)
+
+        st.markdown("###### 📋 Priorización de Nodos para Programar Visita Especializada")
         st.dataframe(resumen_nodos, use_container_width=True, hide_index=True)
+
+        with st.expander("🔎 Ver Detalle Técnico Completo de las Órdenes por Nodo"):
+            st.dataframe(df_nodos_filt, use_container_width=True, hide_index=True)
     else:
         st.info("No se detectaron códigos de nodos en la selección actual.")
 
@@ -1497,14 +1629,14 @@ with tab_mapa:
 
 # ================= TAB 8: BASE CONSOLIDADA Y AUDITORÍA =================
 with tab_datos:
-    st.markdown("##### 📋 Registros Consolidados con Clasificación de Turno, Horas Extras, Orden de Trabajo, Nodos y Observaciones")
+    st.markdown("##### 📋 Registros Consolidados con Clasificación de Turno, Horas Extras, Cola EGAM, Nodos y Observaciones")
     cols_auditoria = [c for c in [
         'Fecha_Str', 'Anio', 'Mes_Nombre', 'Sector', 'Zona_Oficial', 'Recurso',
         'Turno_Detectado_Dia', 'Clasificacion_Jornada', 'Entorno_Ubicacion',
-        'Orden_Trabajo', 'ID_Actividad', 'Subtipo_Actividad', 'Estado_Actividad',
+        'Orden_Trabajo', 'ID_Actividad', 'Numero_Descargo', 'Subtipo_Actividad', 'Estado_Actividad',
         'Origen_Cancelacion', 'Nodos_Detectados',
-        'Hora_Asignacion', 'Inicio', 'Finalización',
-        'Minutos_Reaccion', 'Minutos_Viaje', 'Minutos_Duracion',
+        'Fecha_Generacion', 'Hora_Asignacion', 'Inicio', 'Finalización',
+        'Minutos_Cola_EGAM', 'Minutos_Reaccion', 'Minutos_Viaje', 'Minutos_Duracion',
         'Minutos_En_Jornada', 'Minutos_Extra_PostTurno',
         'Observaciones', 'Descripcion_Orden', 'Motivo_Cancelacion',
         'Comentarios_Cancelacion', 'Comentarios_Suspension'
