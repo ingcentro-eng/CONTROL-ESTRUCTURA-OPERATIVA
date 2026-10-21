@@ -30,27 +30,27 @@ st.markdown("""
     .metric-card {
         background: #ffffff;
         border-radius: 10px;
-        padding: 16px 18px;
+        padding: 15px 18px;
         border: 1px solid #e2e8f0;
         box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
         margin-bottom: 12px;
     }
     .metric-title {
         color: #64748b;
-        font-size: 0.75rem;
+        font-size: 0.74rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
     .metric-value {
         color: #0f172a;
-        font-size: 1.7rem;
+        font-size: 1.65rem;
         font-weight: 800;
         margin-top: 4px;
     }
     .metric-sub {
         color: #334155;
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         font-weight: 500;
         margin-top: 4px;
     }
@@ -90,16 +90,16 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.03);
     }
     .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
+        gap: 5px;
     }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
         border-radius: 6px;
-        padding: 8px 14px;
+        padding: 8px 12px;
         border: 1px solid #e2e8f0;
         font-weight: 600;
         color: #334155;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
     }
     .stTabs [aria-selected="true"] {
         background-color: #0f172a !important;
@@ -110,7 +110,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 3. MAESTRO OFICIAL DE RECURSOS, SECTORES Y ZONAS
+# 3. MAESTRO OFICIAL DE RECURSOS, SECTORES, ZONAS Y REGLAS DE TURNO
 # -----------------------------------------------------------------------------
 MAESTRO_ZONAS = {
     "BOLG-332": ("CENTRO", "IBAGUE URBANA"),
@@ -169,6 +169,12 @@ MAESTRO_ZONAS = {
     "BOLM-350": ("NORTE", "MARIQUITA")
 }
 
+# Grupos de Reglas de Horario Oficial
+ROTATIVAS_3T_CENTRO = {"BOLG-332", "BOLV-330", "BOLV-333", "BOLV-336", "BOLV-394", "BOLV-397", "BOLV-399"}
+ROTATIVAS_2T_NORTE = {"BOLV-363", "BOLV-365"} # 06:00-14:00 y 14:00-22:00
+ROTATIVAS_3T_NORTE = {"BOLV-366", "BOLV-368", "BOLV-396"} # 06:00-14:00, 14:00-22:00, 22:00-06:00
+BOLE_ESPECIALES = {"BOLE-990", "BOLE-999"} # L-V 07:30-16:30
+
 MESES_ES = {
     1: "01 - Enero", 2: "02 - Febrero", 3: "03 - Marzo", 4: "04 - Abril",
     5: "05 - Mayo", 6: "06 - Junio", 7: "07 - Julio", 8: "08 - Agosto",
@@ -200,6 +206,17 @@ def convert_time_to_minutes(time_val):
         return 0.0
 
 
+def hour_str_to_min_of_day(val):
+    """Convierte una hora 'HH:MM' en el minuto del día (0 a 1439)."""
+    if pd.isna(val):
+        return np.nan
+    s = str(val).strip()
+    m = re.search(r'^(\d{1,2}):(\d{2})', s)
+    if m:
+        return int(m.group(1)) * 60 + int(m.group(2))
+    return np.nan
+
+
 def parse_google_drive_url(url: str) -> str:
     """Convierte enlaces compartidos de Google Drive en descarga directa."""
     if not url:
@@ -229,8 +246,88 @@ def normalize_recurso_key(recurso_str: str) -> str:
     return s
 
 
+def get_shift_profile(recurso_base: str):
+    """
+    Retorna la regla de horario oficial de cada brigada:
+    (descripcion_horario, tipo_turno, min_inicio_fijo, min_fin_fijo, horas_netas_turno)
+    """
+    if recurso_base in BOLE_ESPECIALES:
+        return ("L-V 07:30-16:30 (Enlace CELSIA)", "FIJO_BOLE", 7*60+30, 16*60+30, 8.0)
+    if recurso_base == "BOLV-398":
+        return ("Fijo 08:00-16:00 (1h Alim.)", "FIJO", 8*60, 16*60, 7.0)
+    if recurso_base in {"BOLM-348", "BOLM-353"}:
+        return ("Fijo 09:00-17:00 (1h Alim.)", "FIJO", 9*60, 17*60, 7.0)
+    if recurso_base in ROTATIVAS_3T_CENTRO:
+        return ("Rotativo 3T Urbano (6-14 / 14-22 / 22-6)", "ROTATIVO_3T", None, None, 8.0)
+    if recurso_base in ROTATIVAS_2T_NORTE:
+        return ("Rotativo 2T Norte (6-14 / 14-22)", "ROTATIVO_2T", None, None, 8.0)
+    if recurso_base in ROTATIVAS_3T_NORTE:
+        return ("Rotativo 3T Norte (6-14 / 14-22 / 22-6)", "ROTATIVO_3T", None, None, 8.0)
+    # Resto de Rurales Centro y Municipios Norte/Centro
+    return ("Fijo 07:00-15:00 (1h Alim.)", "FIJO", 7*60, 15*60, 7.0)
+
+
+def infer_daily_shift_window(tipo_turno, min_ini_fijo, min_fin_fijo, mins_inicio_dia):
+    """
+    Determina la ventana de minutos (inicio, fin) del turno de ese día específico
+    para detectar actividades dentro de turno vs post-turno.
+    """
+    if tipo_turno in {"FIJO", "FIJO_BOLE"}:
+        return min_ini_fijo, min_fin_fijo, f"{min_ini_fijo//60:02d}:{min_ini_fijo%60:02d} a {min_fin_fijo//60:02d}:{min_fin_fijo%60:02d}"
+    
+    valid_mins = [m for m in mins_inicio_dia if pd.notna(m)]
+    first_m = min(valid_mins) if valid_mins else 360
+
+    if tipo_turno == "ROTATIVO_2T":
+        # Turno Mañana (06:00 a 14:00) vs Turno Tarde (14:00 a 22:00)
+        if first_m < 12 * 60:
+            return 6*60, 14*60, "Turno 1 (06:00 a 14:00)"
+        else:
+            return 14*60, 22*60, "Turno 2 (14:00 a 22:00)"
+
+    if tipo_turno == "ROTATIVO_3T":
+        # Detectar si es Turno 1 (6-14), Turno 2 (14-22) o Turno 3 (22-06)
+        has_night = any(m >= 21*60 + 30 or m < 5*60 for m in valid_mins)
+        has_morning = any(5*60 <= m < 12*60 for m in valid_mins)
+        if has_night and not has_morning:
+            return 22*60, 30*60, "Turno 3 Nocturno (22:00 a 06:00)"
+        elif first_m < 12*60:
+            return 6*60, 14*60, "Turno 1 Mañana (06:00 a 14:00)"
+        else:
+            return 14*60, 22*60, "Turno 2 Tarde (14:00 a 22:00)"
+
+    return 7*60, 15*60, "07:00 a 15:00"
+
+
+def classify_urban_vs_rural(row):
+    """Clasifica si el aviso atendido es en Casco Urbano del Municipio o en Vereda/Rural."""
+    zona_of = str(row.get('Zona_Oficial', '')).upper()
+    if zona_of == "IBAGUE URBANA":
+        return "🏙️ Ibagué Casco Urbano"
+    
+    txt = f"{row.get('Dirección', '')} {row.get('Descripcion_Orden', '')} {row.get('Observaciones', '')}".upper()
+    
+    # Indicadores de Vereda / Rural
+    is_rural = any(k in txt for k in [
+        "VDA", "VEREDA", "FCA", "FINCA", "HDA", "HACIENDA", "CORREGIMIENTO",
+        "PARCELA", "SECTOR RURAL", "KMT", "KM ", "RAMAL", "CRUCE"
+    ])
+    # Indicadores de Casco Urbano en Municipio
+    is_urban = any(k in txt for k in [
+        "CRA", "CARRERA", "CLL", "CALLE", "BARRIO", "B/ ", "B.", "CENTRO",
+        "MZ", "MANZANA", "URB ", "URBANIZACION", "CONJUNTO", "DIAGONAL", "TRANSVERSAL", "APTO"
+    ])
+    
+    if is_urban and not is_rural:
+        return "🏘️ Casco Urbano Municipio"
+    if is_rural:
+        return "🌲 Zona Veredal / Rural"
+    if zona_of == "IBAGUE RURAL":
+        return "🌲 Zona Veredal / Rural"
+    return "📍 General Municipio"
+
+
 def extract_lat_lon(coord_str):
-    """Extrae latitud y longitud de cadenas tipo 'lat:4.4463,lng:-75.2316'."""
     if pd.isna(coord_str):
         return np.nan, np.nan
     s = str(coord_str)
@@ -244,7 +341,6 @@ def extract_lat_lon(coord_str):
 
 
 def calc_reaction_minutes(row):
-    """Calcula minutos entre 'Hora de asignación' e 'Inicio'."""
     asig = row.get('Hora_Asignacion')
     ini = row.get('Inicio')
     if pd.isna(asig) or pd.isna(ini):
@@ -266,7 +362,6 @@ def calc_reaction_minutes(row):
 
 
 def classify_observaciones(obs_text):
-    """Clasifica automáticamente los hallazgos reportados en Observaciones."""
     if pd.isna(obs_text) or not str(obs_text).strip():
         return "Sin Observación"
     t = str(obs_text).upper()
@@ -285,7 +380,6 @@ def classify_observaciones(obs_text):
 
 
 def classify_cancelacion(row):
-    """Clasifica el origen de las actividades canceladas (EGAM, Agrupación RPA, ADMS-INC, Operativo)."""
     estado = str(row.get('Estado_Actividad', '')).lower().strip()
     if estado != 'cancelada':
         return "No Aplica (No Cancelada)"
@@ -309,10 +403,6 @@ def classify_cancelacion(row):
 
 
 def extract_nodes_preserve_exact(row):
-    """
-    Extrae nodos/equipos que empiezan por 6, PF, RB, RC, CD o S tal cual fueron escritos
-    sin alterar ningún carácter del código reportado.
-    """
     textos = [
         str(row.get('Observaciones', '')),
         str(row.get('Comentarios_Suspension', '')),
@@ -323,16 +413,12 @@ def extract_nodes_preserve_exact(row):
     full_text = " ".join([t for t in textos if t and t != 'nan']).upper()
     if not full_text.strip():
         return []
-    
-    # Busca nodos que inicien por PF6..., 6... (6 a 10 caracteres), RB..., RC..., CD..., S... (4 a 7 dígitos)
     pattern = r'\b(?:PF6\d{5,9}[A-Z0-9-]*|6\d{5,9}[A-Z0-9-]*|RB\d{2,6}[A-Z0-9-]*|RC\d{2,6}[A-Z0-9-]*|CD\d{3,7}[A-Z0-9-]*|S\d{4,6}[A-Z0-9-]*)\b'
     found = re.findall(pattern, full_text)
-    # Conservar únicos en orden de aparición tal cual están escritos
     return list(dict.fromkeys(found))
 
 
 def classify_node_type(node_code: str) -> str:
-    """Clasifica el tipo de equipo según su prefijo."""
     c = str(node_code).upper()
     if c.startswith("RB") or c.startswith("RC"):
         return "Reconectador (RB / RC)"
@@ -346,7 +432,7 @@ def classify_node_type(node_code: str) -> str:
 
 
 def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
-    """Estandariza columnas, cruza con el Maestro Oficial de Zonas y calcula métricas."""
+    """Estandariza columnas, asigna zonas, evalúa horarios por brigada y clasifica post-turno."""
     if df.empty:
         return df
     
@@ -374,7 +460,6 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
         if old_col in df.columns:
             df.rename(columns={old_col: new_col}, inplace=True)
 
-    # Asegurar columna Orden_Trabajo e ID_Actividad limpias
     if 'Orden_Trabajo' not in df.columns:
         df['Orden_Trabajo'] = 'Sin OT'
     else:
@@ -385,7 +470,6 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
     else:
         df['ID_Actividad'] = df['ID_Actividad'].fillna('').astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
 
-    # Normalizar Recurso y cruzar con Maestro de Zonas Oficial
     if 'Recurso' in df.columns:
         df['Recurso'] = df['Recurso'].fillna('Sin Recurso').astype(str).str.strip()
     else:
@@ -393,8 +477,9 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
         
     df['Recurso_Base'] = df['Recurso'].apply(normalize_recurso_key)
 
-    sectores_asignados = []
-    zonas_asignadas = []
+    sectores_asignados, zonas_asignadas = [], []
+    desc_horarios, tipos_turno, hrs_netas_base = [], [], []
+
     for idx, row in df.iterrows():
         rec_b = row['Recurso_Base']
         if rec_b in MAESTRO_ZONAS:
@@ -408,35 +493,45 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
             else:
                 sec_of = 'OTRO'
             zon_of = str(row.get('Zona_Trabajo_WFM', 'SIN ZONA ASIGNADA')).upper()
+        
+        d_hor, t_tur, _, _, h_net = get_shift_profile(rec_b)
         sectores_asignados.append(sec_of)
         zonas_asignadas.append(zon_of)
+        desc_horarios.append(d_hor)
+        tipos_turno.append(t_tur)
+        hrs_netas_base.append(h_net)
 
     df['Sector'] = sectores_asignados
     df['Zona_Oficial'] = zonas_asignadas
+    df['Regla_Horario'] = desc_horarios
+    df['Tipo_Turno_Regla'] = tipos_turno
+    df['Horas_Netas_Turno_Base'] = hrs_netas_base
 
-    # Procesar Fechas (Año, Mes, Día)
+    # Procesar Fechas y Día de la semana (para BOLE L-V)
     if 'Fecha' in df.columns:
         fechas_dt = pd.to_datetime(df['Fecha'], errors='coerce')
         df['Fecha_Str'] = fechas_dt.dt.strftime('%Y-%m-%d').fillna('Sin Fecha')
         df['Anio'] = fechas_dt.dt.year.fillna(0).astype(int).astype(str).replace('0', 'Sin Año')
         df['Mes_Num'] = fechas_dt.dt.month.fillna(0).astype(int)
         df['Mes_Nombre'] = df['Mes_Num'].map(MESES_ES).fillna('Sin Mes')
+        df['Dia_Semana_Num'] = fechas_dt.dt.dayofweek.fillna(0).astype(int) # 5=Sábado, 6=Domingo
     else:
         df['Fecha_Str'] = 'Sin Fecha'
         df['Anio'] = 'Sin Año'
         df['Mes_Nombre'] = 'Sin Mes'
+        df['Dia_Semana_Num'] = 0
 
-    # Tiempos en minutos
     df['Minutos_Viaje'] = df['Tiempo_Viaje_Raw'].apply(convert_time_to_minutes) if 'Tiempo_Viaje_Raw' in df.columns else 0.0
     df['Minutos_Duracion'] = df['Duracion_Raw'].apply(convert_time_to_minutes) if 'Duracion_Raw' in df.columns else 0.0
 
-    # Estado de Actividad
+    df['Ini_Min_Dia'] = df['Inicio'].apply(hour_str_to_min_of_day) if 'Inicio' in df.columns else np.nan
+    df['Fin_Min_Dia'] = df['Finalización'].apply(hour_str_to_min_of_day) if 'Finalización' in df.columns else np.nan
+
     if 'Estado_Actividad' in df.columns:
         df['Estado_Actividad'] = df['Estado_Actividad'].fillna('No Definido').astype(str).str.strip().str.capitalize()
     else:
         df['Estado_Actividad'] = 'No Definido'
 
-    # Subtipo de Actividad (Tipo de actividad.1) y Categoría (Operativa vs Rutina)
     if 'Subtipo_Actividad' not in df.columns:
         df['Subtipo_Actividad'] = df.get('Tipo_Actividad_Base', 'General')
     df['Subtipo_Actividad'] = df['Subtipo_Actividad'].fillna('General').astype(str).str.strip()
@@ -445,7 +540,6 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
         lambda x: 'Rutina / Administrativa' if str(x).upper() in ACTIVIDADES_RUTINA else 'Operativa (Daños / OT)'
     )
 
-    # Observaciones y clasificaciones
     for c_txt in ['Observaciones', 'Comentarios_Cancelacion', 'Comentarios_Suspension', 'Comentarios_No_Realizado', 'Motivo_Cancelacion', 'Descripcion_Orden']:
         if c_txt not in df.columns:
             df[c_txt] = ''
@@ -454,13 +548,66 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
 
     df['Etiqueta_Hallazgo'] = df['Observaciones'].apply(classify_observaciones)
     df['Origen_Cancelacion'] = df.apply(classify_cancelacion, axis=1)
+    df['Entorno_Ubicacion'] = df.apply(classify_urban_vs_rural, axis=1)
 
-    # Nodos / Equipos extraídos tal cual
     df['Lista_Nodos'] = df.apply(extract_nodes_preserve_exact, axis=1)
     df['Nodos_Detectados'] = df['Lista_Nodos'].apply(lambda lst: ", ".join(lst) if lst else "")
-
-    # Tiempo de reacción
     df['Minutos_Reaccion'] = df.apply(calc_reaction_minutes, axis=1)
+
+    # -------------------------------------------------------------------------
+    # EVALUACIÓN EXACTA DE JORNADA ORDINARIA VS EXTENSIÓN (CASO A) VS REACTIVACIÓN (CASO B)
+    # -------------------------------------------------------------------------
+    df['Clasificacion_Jornada'] = "En Jornada Ordinaria"
+    df['Turno_Detectado_Dia'] = ""
+
+    for (rec, f_str), group in df.groupby(['Recurso', 'Fecha_Str']):
+        rec_b = group['Recurso_Base'].iloc[0]
+        _, t_turno, m_ini_fijo, m_fin_fijo, _ = get_shift_profile(rec_b)
+        
+        # Determinar ventana de turno del día
+        w_ini, w_fin, label_turno = infer_daily_shift_window(
+            t_turno, m_ini_fijo, m_fin_fijo, group['Ini_Min_Dia'].tolist()
+        )
+        df.loc[group.index, 'Turno_Detectado_Dia'] = label_turno
+
+        # Verificar hora en que marcó 'Fin Turno' si existe
+        fin_turno_rows = group[group['Subtipo_Actividad'].str.upper() == 'FIN TURNO']
+        hora_marca_fin_turno = fin_turno_rows['Ini_Min_Dia'].dropna().min() if not fin_turno_rows['Ini_Min_Dia'].dropna().empty else np.nan
+
+        for idx, r in group.iterrows():
+            # Caso especial BOLE en Sábado o Domingo
+            if rec_b in BOLE_ESPECIALES and r['Dia_Semana_Num'] in [5, 6]:
+                df.loc[idx, 'Clasificacion_Jornada'] = "🚨 Caso Excepcional BOLE (Fin de Semana)"
+                continue
+
+            # Ignorar clasificación post-turno para actividades administrativas de cierre
+            if r['Categoria_Labor'] == 'Rutina / Administrativa':
+                df.loc[idx, 'Clasificacion_Jornada'] = "Rutina de Turno"
+                continue
+
+            ini_m = r['Ini_Min_Dia']
+            fin_m = r['Fin_Min_Dia']
+
+            if pd.isna(ini_m) and pd.isna(fin_m):
+                df.loc[idx, 'Clasificacion_Jornada'] = "Sin Hora Inicio (Cancelada / Pendiente)"
+                continue
+
+            # Para turnos nocturnos (22:00 a 06:00), están en turno
+            if w_fin > 1440:
+                df.loc[idx, 'Clasificacion_Jornada'] = "En Jornada Ordinaria"
+                continue
+
+            # Evaluar si inició después del fin de su turno oficial (o en madrugada antes de entrar)
+            if pd.notna(ini_m) and (ini_m > w_fin + 10 or ini_m < w_ini - 60):
+                # Distinguir Caso B (Reactivación tras Fin Turno o >30 min después de salida) vs Caso A (Extensión continua)
+                if (pd.notna(hora_marca_fin_turno) and ini_m >= hora_marca_fin_turno) or (ini_m >= w_fin + 30) or (ini_m < w_ini - 60):
+                    df.loc[idx, 'Clasificacion_Jornada'] = "🌙 Caso B: Reactivación Post-Turno (Nuevo Llamado)"
+                else:
+                    df.loc[idx, 'Clasificacion_Jornada'] = "⏱️ Caso A: Extensión Continua de Turno"
+            elif pd.notna(fin_m) and fin_m > w_fin + 20:
+                df.loc[idx, 'Clasificacion_Jornada'] = "⏱️ Caso A: Extensión Continua de Turno"
+            else:
+                df.loc[idx, 'Clasificacion_Jornada'] = "En Jornada Ordinaria"
 
     # Coordenadas Geográficas
     lats, lons = [], []
@@ -501,7 +648,6 @@ def load_data_from_url(drive_url: str):
 
 
 def get_semaforo_badge(val):
-    """Retorna etiqueta HTML según regla: >=85% Verde, 50-84.9% Amarillo, <50% Rojo."""
     if val >= 85.0:
         return f'<span class="badge-green">🟢 {val:.1f}% (Óptimo)</span>'
     elif val >= 50.0:
@@ -511,7 +657,6 @@ def get_semaforo_badge(val):
 
 
 def multiselect_with_all(label, options, key_prefix, default_all=True):
-    """Crea un multiselect limpio donde vacío selecciona todos los elementos disponibles."""
     clean_opts = sorted([str(x) for x in options if pd.notna(x) and str(x).strip() != ''])
     sel = st.multiselect(
         label,
@@ -528,7 +673,7 @@ def multiselect_with_all(label, options, key_prefix, default_all=True):
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("## ⚡ Control Operativo BOL")
-    st.caption("Gestión en Tiempo Real de Brigadas")
+    st.caption("Gestión de Turnos, Standby y Trazabilidad")
     st.markdown("---")
     
     st.markdown("**1. Enlace de Datos (Google Drive)**")
@@ -592,7 +737,7 @@ if df_raw is None or df_raw.empty:
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("---")
-    st.markdown("**2. Parámetros de Turno y Labor**")
+    st.markdown("**2. Modo de Evaluación y Horarios**")
     
     modo_enfoque = st.radio(
         "Enfoque de Actividades:",
@@ -601,27 +746,23 @@ with st.sidebar:
             "Todas las Actividades Consolidadas",
             "Solo Rutina / Administrativas"
         ],
-        index=0,
-        help="Separa las órdenes reales de terreno (Incidentes, MT, OT) de las actividades de rutina (Inicio/Fin turno, Alimentación, Charlas)."
+        index=0
     )
     
-    horas_turno = st.slider(
-        "Jornada Laboral por Día Activo (Horas):",
-        min_value=6.0,
-        max_value=12.0,
-        value=8.0,
-        step=0.5
+    usar_horario_oficial = st.checkbox(
+        "Usar Horario Oficial específico de cada Brigada (7h / 8h según turno)",
+        value=True,
+        help="Aplica automáticamente: Rurales/Municipios 7h netas (7-15h), Urbanas/Rotativas 8h continuas, BOLM-353/348 (9-17h), BOLV-398 (8-16h), BOLE (7:30-16:30 L-V)."
     )
     
-    descontar_almuerzo = st.checkbox(
-        "Descontar tiempo de 'Alimentación' de la jornada disponible",
-        value=True
-    )
+    if not usar_horario_oficial:
+        horas_turno_manual = st.slider("Jornada Manual General (Horas):", 6.0, 12.0, 8.0, 0.5)
+    else:
+        horas_turno_manual = None
 
     excluir_rpa_egam_efectividad = st.checkbox(
         "Excluir canceladas por EGAM / RPA del cálculo de Efectividad",
-        value=False,
-        help="Si lo activas, las órdenes canceladas por sistema RPA o consola EGAM no castigan el % de cumplimiento de la brigada."
+        value=False
     )
 
     st.markdown("---")
@@ -663,7 +804,7 @@ with st.sidebar:
 
 
 # -----------------------------------------------------------------------------
-# 8. PROCESAMIENTO DE INDICADORES Y RESUMEN POR BRIGADA
+# 8. PROCESAMIENTO DE INDICADORES Y RESUMEN POR BRIGADA (CON HORARIOS OFICIALES)
 # -----------------------------------------------------------------------------
 if df_f.empty:
     st.warning("No hay actividades que coincidan con la combinación de filtros seleccionada.")
@@ -673,11 +814,13 @@ total_act = len(df_f)
 fin_act = int((df_f['Estado_Actividad'].str.lower() == 'finalizada').sum())
 canc_act = int((df_f['Estado_Actividad'].str.lower() == 'cancelada').sum())
 susp_act = int((df_f['Estado_Actividad'].str.lower() == 'suspendida').sum())
-noreal_act = int((df_f['Estado_Actividad'].str.lower() == 'no realizado').sum())
 
-# Contabilizar canceladas por EGAM y RPA
 canc_egam = int((df_f['Origen_Cancelacion'] == "🖥️ Cancelado por EGAM").sum())
 canc_rpa = int((df_f['Origen_Cancelacion'] == "🤖 Agrupación Automática RPA").sum())
+
+# Contadores de Post-Turno (Caso A y Caso B)
+caso_a_cnt = int((df_f['Clasificacion_Jornada'] == "⏱️ Caso A: Extensión Continua de Turno").sum())
+caso_b_cnt = int((df_f['Clasificacion_Jornada'] == "🌙 Caso B: Reactivación Post-Turno (Nuevo Llamado)").sum())
 
 if excluir_rpa_egam_efectividad:
     denom_global = max(1, total_act - (canc_egam + canc_rpa))
@@ -687,13 +830,12 @@ else:
 
 prom_viaje_global = df_f['Minutos_Viaje'].mean() if total_act > 0 else 0.0
 prom_faena_global = df_f['Minutos_Duracion'].mean() if total_act > 0 else 0.0
-prom_reaccion_global = df_f['Minutos_Reaccion'].dropna().mean() if not df_f['Minutos_Reaccion'].dropna().empty else 0.0
 
 brigadas_activas = df_f['Recurso'].nunique()
 dias_unicos = df_f['Fecha_Str'].nunique()
 
-# Agrupación por Brigada
-rec_stats = df_f.groupby(['Recurso', 'Sector', 'Zona_Oficial']).agg(
+# Agrupación por Brigada separando Horas en Jornada Ordinaria vs Horas Post-Turno
+rec_stats = df_f.groupby(['Recurso', 'Sector', 'Zona_Oficial', 'Regla_Horario', 'Horas_Netas_Turno_Base']).agg(
     Dias_Activos=('Fecha_Str', 'nunique'),
     Total_Asignadas=('ID_Actividad', 'count'),
     Finalizadas=('Estado_Actividad', lambda x: (x.str.lower() == 'finalizada').sum()),
@@ -702,8 +844,16 @@ rec_stats = df_f.groupby(['Recurso', 'Sector', 'Zona_Oficial']).agg(
     Canc_RPA=('Origen_Cancelacion', lambda x: (x == "🤖 Agrupación Automática RPA").sum()),
     Suspendidas=('Estado_Actividad', lambda x: (x.str.lower() == 'suspendida').sum()),
     No_Realizadas=('Estado_Actividad', lambda x: (x.str.lower() == 'no realizado').sum()),
-    Min_Viaje_Total=('Minutos_Viaje', 'sum'),
-    Min_Faena_Total=('Minutos_Duracion', 'sum'),
+    Min_Ord_Ocupado=('Minutos_Duracion', lambda s: (
+        s[df_f.loc[s.index, 'Clasificacion_Jornada'] == "En Jornada Ordinaria"].sum() +
+        df_f.loc[s.index][df_f.loc[s.index, 'Clasificacion_Jornada'] == "En Jornada Ordinaria"]['Minutos_Viaje'].sum()
+    )),
+    Min_Post_Turno=('Minutos_Duracion', lambda s: (
+        s[df_f.loc[s.index, 'Clasificacion_Jornada'].str.contains("Caso A|Caso B", na=False)].sum() +
+        df_f.loc[s.index][df_f.loc[s.index, 'Clasificacion_Jornada'].str.contains("Caso A|Caso B", na=False)]['Minutos_Viaje'].sum()
+    )),
+    Eventos_Reactivacion_B=('Clasificacion_Jornada', lambda x: (x == "🌙 Caso B: Reactivación Post-Turno (Nuevo Llamado)").sum()),
+    Eventos_Extension_A=('Clasificacion_Jornada', lambda x: (x == "⏱️ Caso A: Extensión Continua de Turno").sum()),
     Prom_Viaje_Min=('Minutos_Viaje', 'mean'),
     Prom_Faena_Min=('Minutos_Duracion', 'mean'),
     Prom_Reaccion_Min=('Minutos_Reaccion', 'mean')
@@ -711,7 +861,7 @@ rec_stats = df_f.groupby(['Recurso', 'Sector', 'Zona_Oficial']).agg(
 
 rutina_stats = df_contexto_turno.groupby('Recurso').agg(
     Dias_Turno_Real=('Fecha_Str', 'nunique'),
-    Min_Alimentacion=('Minutos_Duracion', lambda s: s[df_contexto_turno.loc[s.index, 'Subtipo_Actividad'].str.upper().isin(['ALIMENTACIÓN', 'ALIMENTACION'])].sum()),
+    Turno_Actual=('Turno_Detectado_Dia', lambda s: s.iloc[-1] if not s.empty else ""),
     Primer_Inicio=('Inicio', lambda s: sorted([str(v) for v in s.dropna() if ':' in str(v)])[0] if any(':' in str(v) for v in s.dropna()) else '--:--'),
     Ultimo_Fin=('Finalización', lambda s: sorted([str(v) for v in s.dropna() if ':' in str(v)])[-1] if any(':' in str(v) for v in s.dropna()) else '--:--')
 ).reset_index()
@@ -737,16 +887,17 @@ def clasificar_semaforo(v):
 
 rec_stats['Semaforo'] = rec_stats['Efectividad_%'].apply(clasificar_semaforo)
 
-rec_stats['Horas_Turno_Periodo'] = (rec_stats['Dias_Turno_Real'].replace(0, 1) * horas_turno).round(2)
-rec_stats['Horas_Almuerzo'] = (rec_stats['Min_Alimentacion'] / 60.0).round(2)
-rec_stats['Horas_Ocupadas'] = ((rec_stats['Min_Viaje_Total'] + rec_stats['Min_Faena_Total']) / 60.0).round(2)
-
-if descontar_almuerzo:
-    horas_disp_neta = rec_stats['Horas_Turno_Periodo'] - rec_stats['Horas_Almuerzo']
+# Horas de turno disponibles según regla oficial de cada brigada (7h u 8h netas) o slider manual
+if usar_horario_oficial:
+    rec_stats['Horas_Netas_Disponibles'] = (rec_stats['Dias_Turno_Real'].replace(0, 1) * rec_stats['Horas_Netas_Turno_Base']).round(2)
 else:
-    horas_disp_neta = rec_stats['Horas_Turno_Periodo']
+    rec_stats['Horas_Netas_Disponibles'] = (rec_stats['Dias_Turno_Real'].replace(0, 1) * horas_turno_manual).round(2)
 
-rec_stats['Horas_Sin_Atender'] = (horas_disp_neta - rec_stats['Horas_Ocupadas']).apply(lambda x: max(0.0, round(x, 2)))
+rec_stats['Horas_En_Jornada'] = (rec_stats['Min_Ord_Ocupado'] / 60.0).round(2)
+rec_stats['Horas_Post_Turno'] = (rec_stats['Min_Post_Turno'] / 60.0).round(2)
+
+# El Standby en jornada se mide exclusivamente contra las horas trabajadas DENTRO del turno ordinario
+rec_stats['Horas_Sin_Atender'] = (rec_stats['Horas_Netas_Disponibles'] - rec_stats['Horas_En_Jornada']).apply(lambda x: max(0.0, round(x, 2)))
 rec_stats['Prom_Viaje_Min'] = rec_stats['Prom_Viaje_Min'].round(1)
 rec_stats['Prom_Faena_Min'] = rec_stats['Prom_Faena_Min'].round(1)
 rec_stats['Prom_Reaccion_Min'] = rec_stats['Prom_Reaccion_Min'].fillna(0.0).round(1)
@@ -758,7 +909,7 @@ rec_stats['Prom_Reaccion_Min'] = rec_stats['Prom_Reaccion_Min'].fillna(0.0).roun
 st.markdown("### ⚡ Centro de Control y Seguimiento Diario de Brigadas (BOL)")
 st.caption(
     f"Modo activo: **{modo_enfoque}** | Días evaluados: **{dias_unicos}** | "
-    f"Brigadas activas: **{brigadas_activas}** | Meta de Cumplimiento: **≥ 85%**"
+    f"Brigadas activas: **{brigadas_activas}** | Regla Horaria: **{'Oficial por Brigada (7h/8h)' if usar_horario_oficial else 'Manual'}**"
 )
 
 k1, k2, k3, k4, k5, k6 = st.columns(6)
@@ -795,18 +946,18 @@ with k3:
 with k4:
     st.markdown(f"""
     <div class="metric-card">
-        <div class="metric-title">Prom. Desplazamiento</div>
-        <div class="metric-value">{prom_viaje_global:.0f} <span style="font-size:1rem;color:#64748b;">min</span></div>
-        <div class="metric-sub">Total ruta: {(df_f['Minutos_Viaje'].sum()/60):.1f} hrs</div>
+        <div class="metric-title">Prom. Ruta / Faena</div>
+        <div class="metric-value">{prom_viaje_global:.0f}m / {prom_faena_global:.0f}m</div>
+        <div class="metric-sub">Viaje prom. vs Atención prom.</div>
     </div>
     """, unsafe_allow_html=True)
 
 with k5:
     st.markdown(f"""
     <div class="metric-card">
-        <div class="metric-title">Prom. Atención (Faena)</div>
-        <div class="metric-value">{prom_faena_global:.0f} <span style="font-size:1rem;color:#64748b;">min</span></div>
-        <div class="metric-sub">Total labor: {(df_f['Minutos_Duracion'].sum()/60):.1f} hrs</div>
+        <div class="metric-title">Salidas Post-Turno</div>
+        <div class="metric-value">{caso_b_cnt + caso_a_cnt}</div>
+        <div class="metric-sub">🌙 {caso_b_cnt} Reactivadas | ⏱️ {caso_a_cnt} Extensión</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -821,24 +972,25 @@ with k6:
 
 
 # -----------------------------------------------------------------------------
-# 10. PESTAÑAS DE NAVEGACIÓN PROFESIONAL (7 PESTAÑAS ESPECIALIZADAS)
+# 10. PESTAÑAS DE NAVEGACIÓN PROFESIONAL (8 PESTAÑAS ESPECIALIZADAS)
 # -----------------------------------------------------------------------------
-tab_brigadas, tab_zonas, tab_tiempos, tab_nodos, tab_obs, tab_mapa, tab_datos = st.tabs([
-    "👷 Control Brigadas y Standby",
+tab_brigadas, tab_post, tab_zonas, tab_tiempos, tab_nodos, tab_obs, tab_mapa, tab_datos = st.tabs([
+    "👷 Brigadas y Standby (Turnos)",
+    "🌙 Post-Turno y Casco Urbano Municipios",
     "🗺️ Desempeño Zonas Oficiales",
     "⏱️ Tiempos y Reacción",
-    "⚡ Nodos y Equipos Recurrentes",
-    "🔍 Observaciones y Cancelados EGAM/RPA",
-    "📍 Mapa y Trazabilidad de Ruta",
+    "⚡ Nodos Recurrentes",
+    "🔍 Observaciones y EGAM/RPA",
+    "📍 Mapa y Trazabilidad",
     "📋 Base Consolidada"
 ])
 
-# ================= TAB 1: CONTROL DE BRIGADAS Y STANDBY =================
+# ================= TAB 1: CONTROL DE BRIGADAS Y STANDBY (HORARIOS REALES) =================
 with tab_brigadas:
     col_b1, col_b2 = st.columns(2)
     
     with col_b1:
-        st.markdown("##### ⏳ Top 15 Brigadas con Mayor Tiempo Sin Atender (Standby en Horas)")
+        st.markdown("##### ⏳ Top 15 Brigadas con Mayor Tiempo Sin Atender en su Turno (Standby Puro)")
         df_top_sb = rec_stats.sort_values(by='Horas_Sin_Atender', ascending=False).head(15)
         fig_sb = px.bar(
             df_top_sb,
@@ -847,16 +999,16 @@ with tab_brigadas:
             color='Sector',
             orientation='h',
             text='Horas_Sin_Atender',
-            hover_data=['Zona_Oficial', 'Horas_Ocupadas', 'Total_Asignadas', 'Finalizadas'],
-            color_discrete_map={'CENTRO': '#1e293b', 'NORTE': '#2563eb', 'OTRO': '#64748b'},
-            labels={'Horas_Sin_Atender': 'Horas Sin Atender (Standby)', 'Recurso': 'Brigada'}
+            hover_data=['Zona_Oficial', 'Regla_Horario', 'Turno_Actual', 'Horas_En_Jornada', 'Horas_Post_Turno'],
+            color_discrete_map={'CENTRO': '#0f172a', 'NORTE': '#2563eb', 'OTRO': '#64748b'},
+            labels={'Horas_Sin_Atender': 'Horas Sin Atender en Turno (Standby)', 'Recurso': 'Brigada'}
         )
         fig_sb.update_traces(texttemplate='%{text:.1f} h', textposition='outside')
         fig_sb.update_layout(yaxis=dict(autorange="reversed"), height=400, margin=dict(t=10, b=10, l=10, r=40))
         st.plotly_chart(fig_sb, use_container_width=True)
 
     with col_b2:
-        st.markdown("##### 🎯 Cumplimiento de Efectividad por Brigada (Semáforo Oficial)")
+        st.markdown("##### 🎯 Cumplimiento de Efectividad por Brigada (Semáforo Oficial ≥ 85%)")
         df_top_ef = rec_stats.sort_values(by='Efectividad_%', ascending=True).head(15)
         fig_ef = px.bar(
             df_top_ef,
@@ -879,38 +1031,131 @@ with tab_brigadas:
         fig_ef.update_layout(height=400, margin=dict(t=10, b=10, l=10, r=40), legend=dict(orientation="h", y=1.1))
         st.plotly_chart(fig_ef, use_container_width=True)
 
-    st.markdown("##### 📊 Matriz Integral de Control por Brigada")
+    st.markdown("##### 📊 Matriz Integral por Brigada (Con Regla de Turno Oficial, Standby en Jornada y Horas Post-Turno)")
     cols_show_brig = [
-        'Recurso', 'Sector', 'Zona_Oficial', 'Semaforo', 'Efectividad_%',
-        'Dias_Activos', 'Total_Asignadas', 'Finalizadas', 'Fin_Por_Dia',
-        'Canceladas', 'Canc_EGAM', 'Canc_RPA', 'Suspendidas', 'No_Realizadas',
-        'Prom_Viaje_Min', 'Prom_Faena_Min', 'Prom_Reaccion_Min',
-        'Horas_Ocupadas', 'Horas_Sin_Atender', 'Primer_Inicio', 'Ultimo_Fin'
+        'Recurso', 'Sector', 'Zona_Oficial', 'Regla_Horario', 'Turno_Actual',
+        'Semaforo', 'Efectividad_%', 'Total_Asignadas', 'Finalizadas', 'Fin_Por_Dia',
+        'Canceladas', 'Canc_EGAM', 'Canc_RPA', 'Suspendidas',
+        'Horas_Netas_Disponibles', 'Horas_En_Jornada', 'Horas_Sin_Atender',
+        'Horas_Post_Turno', 'Eventos_Reactivacion_B', 'Eventos_Extension_A',
+        'Primer_Inicio', 'Ultimo_Fin'
     ]
     st.dataframe(
         rec_stats[cols_show_brig].sort_values(by='Horas_Sin_Atender', ascending=False),
         column_config={
-            "Zona_Oficial": "Zona Asignada",
+            "Zona_Oficial": "Zona Oficial",
+            "Regla_Horario": "Esquema Turno",
+            "Turno_Actual": "Turno Detectado",
             "Semaforo": "Estado Meta",
-            "Efectividad_%": st.column_config.ProgressColumn("Efectividad (%)", format="%.1f%%", min_value=0, max_value=100),
-            "Dias_Activos": "Días",
-            "Total_Asignadas": "Asignadas",
-            "Fin_Por_Dia": st.column_config.NumberColumn("Fin. / Día", format="%.1f"),
+            "Efectividad_%": st.column_config.ProgressColumn("Efectividad", format="%.1f%%", min_value=0, max_value=100),
+            "Total_Asignadas": "Asig.",
+            "Fin_Por_Dia": st.column_config.NumberColumn("Fin/Día", format="%.1f"),
             "Canc_EGAM": "Canc. EGAM",
             "Canc_RPA": "Canc. RPA",
-            "Prom_Viaje_Min": st.column_config.NumberColumn("Viaje Prom.", format="%.0f min"),
-            "Prom_Faena_Min": st.column_config.NumberColumn("Faena Prom.", format="%.0f min"),
-            "Prom_Reaccion_Min": st.column_config.NumberColumn("Reacción", format="%.0f min"),
-            "Horas_Ocupadas": st.column_config.NumberColumn("Hrs Labor", format="%.2f h"),
+            "Horas_Netas_Disponibles": st.column_config.NumberColumn("Turno Neto", format="%.1f h"),
+            "Horas_En_Jornada": st.column_config.NumberColumn("Hrs en Turno", format="%.2f h"),
             "Horas_Sin_Atender": st.column_config.NumberColumn("Hrs Standby", format="%.2f h"),
-            "Primer_Inicio": "1er Inicio",
-            "Ultimo_Fin": "Último Cierre"
+            "Horas_Post_Turno": st.column_config.NumberColumn("Hrs Post-Turno", format="%.2f h"),
+            "Eventos_Reactivacion_B": "Reactiv. (Caso B)",
+            "Eventos_Extension_A": "Extens. (Caso A)"
         },
         use_container_width=True,
         hide_index=True
     )
 
-# ================= TAB 2: DESEMPEÑO POR ZONAS OFICIALES =================
+# ================= TAB 2: POST-TURNO Y CASCO URBANO DE MUNICIPIOS =================
+with tab_post:
+    st.markdown("##### 🌙 Control de Salidas Post-Turno (Caso A: Extensión Continua vs. Caso B: Reactivación / Llamado Nocturno)")
+    st.caption("Distingue si la brigada se extendió terminando un daño de su turno (Caso A) o si ya había cerrado turno y fue reactivada para atender un evento (Caso B).")
+
+    df_post = df_f[df_f['Clasificacion_Jornada'].str.contains("Caso A|Caso B|Excepcional", na=False)].copy()
+
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        if not df_post.empty:
+            post_cnt = df_post.groupby(['Recurso', 'Clasificacion_Jornada']).size().reset_index(name='Eventos')
+            fig_post = px.bar(
+                post_cnt,
+                x='Eventos',
+                y='Recurso',
+                color='Clasificacion_Jornada',
+                orientation='h',
+                barmode='stack',
+                title="Brigadas con Actividad Fuera de su Horario Ordinario",
+                color_discrete_map={
+                    "🌙 Caso B: Reactivación Post-Turno (Nuevo Llamado)": "#7c3aed",
+                    "⏱️ Caso A: Extensión Continua de Turno": "#f59e0b",
+                    "🚨 Caso Excepcional BOLE (Fin de Semana)": "#ef4444"
+                }
+            )
+            fig_post.update_layout(yaxis=dict(autorange="reversed"), height=350, margin=dict(t=35, b=10, l=10, r=10), legend=dict(orientation="h", y=1.15))
+            st.plotly_chart(fig_post, use_container_width=True)
+        else:
+            st.info("No se registran salidas post-turno en la selección actual.")
+
+    with col_p2:
+        # Avisos en Municipios (Excluyendo Ibagué Urbana) clasificados en Casco Urbano vs Veredal
+        df_muni_urb = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()
+        if not df_muni_urb.empty:
+            urb_cnt = df_muni_urb.groupby(['Zona_Oficial', 'Entorno_Ubicacion']).size().reset_index(name='Cantidad')
+            fig_urb = px.bar(
+                urb_cnt,
+                x='Zona_Oficial',
+                y='Cantidad',
+                color='Entorno_Ubicacion',
+                barmode='stack',
+                title="Municipios y Rurales: Avisos en Casco Urbano vs. Zona Veredal",
+                color_discrete_map={
+                    "🏘️ Casco Urbano Municipio": "#2563eb",
+                    "🌲 Zona Veredal / Rural": "#10b981",
+                    "📍 General Municipio": "#94a3b8"
+                }
+            )
+            fig_urb.update_layout(height=350, margin=dict(t=35, b=10, l=10, r=10), legend=dict(orientation="h", y=1.15))
+            st.plotly_chart(fig_urb, use_container_width=True)
+        else:
+            st.info("Selecciona zonas de municipios para ver la proporción Casco Urbano vs. Vereda.")
+
+    st.markdown("###### 📋 Detalle de Eventos Post-Turno (Reactivaciones Caso B y Extensiones Caso A)")
+    if not df_post.empty:
+        cols_post_tbl = [
+            'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Turno_Detectado_Dia',
+            'Clasificacion_Jornada', 'Entorno_Ubicacion', 'Orden_Trabajo', 'ID_Actividad',
+            'Subtipo_Actividad', 'Estado_Actividad', 'Hora_Asignacion', 'Inicio', 'Finalización',
+            'Minutos_Viaje', 'Minutos_Duracion', 'Observaciones', 'Descripcion_Orden'
+        ]
+        st.dataframe(
+            df_post[[c for c in cols_post_tbl if c in df_post.columns]],
+            use_container_width=True,
+            hide_index=True
+        )
+
+    st.markdown("---")
+    st.markdown("###### 🏘️ Buscador y Monitor de Avisos Atendidos en el Casco Urbano de los Municipios")
+    f_entorno = st.radio(
+        "Filtrar avisos de Municipios por tipo de ubicación:",
+        options=["Todos los de Municipios", "Solo 🏘️ Casco Urbano Municipio", "Solo 🌲 Zona Veredal / Rural"],
+        horizontal=True
+    )
+    df_muni_view = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()
+    if f_entorno == "Solo 🏘️ Casco Urbano Municipio":
+        df_muni_view = df_muni_view[df_muni_view['Entorno_Ubicacion'] == "🏘️ Casco Urbano Municipio"]
+    elif f_entorno == "Solo 🌲 Zona Veredal / Rural":
+        df_muni_view = df_muni_view[df_muni_view['Entorno_Ubicacion'] == "🌲 Zona Veredal / Rural"]
+
+    cols_muni_tbl = [
+        'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Entorno_Ubicacion',
+        'Clasificacion_Jornada', 'Orden_Trabajo', 'ID_Actividad', 'Estado_Actividad',
+        'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Dirección',
+        'Descripcion_Orden', 'Observaciones'
+    ]
+    st.dataframe(
+        df_muni_view[[c for c in cols_muni_tbl if c in df_muni_view.columns]],
+        use_container_width=True,
+        hide_index=True
+    )
+
+# ================= TAB 3: DESEMPEÑO POR ZONAS OFICIALES =================
 with tab_zonas:
     zona_summary = df_f.groupby(['Sector', 'Zona_Oficial']).agg(
         Brigadas=('Recurso', 'nunique'),
@@ -934,40 +1179,26 @@ with tab_zonas:
             x='Zona_Oficial',
             y=['Finalizadas', 'Canceladas', 'Suspendidas'],
             barmode='stack',
-            color_discrete_map={'Finalizadas': '#10b981', 'Canceladas': '#ef4444', 'Suspendidas': '#f59e0b'},
-            labels={'value': 'Cantidad de Actividades', 'Zona_Oficial': 'Zona Oficial'}
+            color_discrete_map={'Finalizadas': '#10b981', 'Canceladas': '#ef4444', 'Suspendidas': '#f59e0b'}
         )
         fig_z_vol.update_layout(height=380, margin=dict(t=10, b=10, l=10, r=10), legend=dict(orientation="h", y=1.1))
         st.plotly_chart(fig_z_vol, use_container_width=True)
 
     with col_z2:
-        st.markdown("##### 🚗 Comparativa por Zona: Horas en Ruta (Viaje) vs. Horas en Atención (Faena)")
+        st.markdown("##### 🚗 Comparativa por Zona: Horas en Ruta vs. Horas en Faena")
         fig_z_time = px.bar(
             zona_summary,
             x='Zona_Oficial',
             y=['Horas_Viaje', 'Horas_Faena'],
             barmode='group',
-            color_discrete_map={'Horas_Viaje': '#3b82f6', 'Horas_Faena': '#0f172a'},
-            labels={'value': 'Horas Acumuladas', 'Zona_Oficial': 'Zona Oficial'}
+            color_discrete_map={'Horas_Viaje': '#3b82f6', 'Horas_Faena': '#0f172a'}
         )
         fig_z_time.update_layout(height=380, margin=dict(t=10, b=10, l=10, r=10), legend=dict(orientation="h", y=1.1))
         st.plotly_chart(fig_z_time, use_container_width=True)
 
-    st.markdown("##### 📋 Resumen Ejecutivo por Zona Oficial")
-    st.dataframe(
-        zona_summary,
-        column_config={
-            "Efectividad_%": st.column_config.ProgressColumn("Efectividad (%)", format="%.1f%%", min_value=0, max_value=100),
-            "Prom_Viaje_Min": st.column_config.NumberColumn("Prom. Viaje", format="%.1f min"),
-            "Prom_Faena_Min": st.column_config.NumberColumn("Prom. Faena", format="%.1f min"),
-            "Horas_Viaje": st.column_config.NumberColumn("Total Viaje", format="%.2f h"),
-            "Horas_Faena": st.column_config.NumberColumn("Total Faena", format="%.2f h")
-        },
-        use_container_width=True,
-        hide_index=True
-    )
+    st.dataframe(zona_summary, use_container_width=True, hide_index=True)
 
-# ================= TAB 3: TIEMPOS, REACCIÓN Y TRAZA HORARIA =================
+# ================= TAB 4: TIEMPOS, REACCIÓN Y TRAZA HORARIA =================
 with tab_tiempos:
     col_t1, col_t2 = st.columns(2)
     
@@ -981,8 +1212,7 @@ with tab_tiempos:
                 y='Recurso',
                 color='Zona_Oficial',
                 orientation='h',
-                text='Prom_Reaccion_Min',
-                labels={'Prom_Reaccion_Min': 'Minutos Promedio de Reacción', 'Recurso': 'Brigada'}
+                text='Prom_Reaccion_Min'
             )
             fig_reac.update_traces(texttemplate='%{text:.0f} min', textposition='outside')
             fig_reac.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=10, b=10, l=10, r=40))
@@ -1005,26 +1235,11 @@ with tab_tiempos:
         fig_sub.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=10, b=10, l=10, r=10))
         st.plotly_chart(fig_sub, use_container_width=True)
 
-    st.markdown("##### 📈 Comportamiento Diario de Actividades (Evolución Temporal)")
-    diario_df = df_f.groupby(['Fecha_Str', 'Estado_Actividad']).size().reset_index(name='Cantidad')
-    fig_evol = px.bar(
-        diario_df,
-        x='Fecha_Str',
-        y='Cantidad',
-        color='Estado_Actividad',
-        barmode='group',
-        color_discrete_map={'Finalizada': '#10b981', 'Cancelada': '#ef4444', 'Suspendida': '#f59e0b', 'No realizado': '#64748b'},
-        labels={'Fecha_Str': 'Fecha Operativa', 'Cantidad': 'N° de Actividades'}
-    )
-    fig_evol.update_layout(height=320, margin=dict(t=10, b=10, l=10, r=10))
-    st.plotly_chart(fig_evol, use_container_width=True)
-
-# ================= TAB 4: NODOS Y EQUIPOS RECURRENTES =================
+# ================= TAB 5: NODOS Y EQUIPOS RECURRENTES =================
 with tab_nodos:
     st.markdown("##### ⚡ Detección de Nodos / Equipos Recurrentes para Visita Especializada")
-    st.caption("Extrae exactamente tal cual fueron reportados los códigos que inician por **6**, **PF**, **RB**, **RC**, **CD** o **S** en Observaciones, Comentarios y Descripción.")
+    st.caption("Códigos exactos tal cual fueron reportados que inician por **6**, **PF**, **RB**, **RC**, **CD** o **S**.")
 
-    # Expandir filas con nodos detectados
     rows_nodos = []
     for idx, r in df_f.iterrows():
         for nd in r['Lista_Nodos']:
@@ -1038,16 +1253,12 @@ with tab_nodos:
                 'Orden_Trabajo': r['Orden_Trabajo'],
                 'ID_Actividad': r['ID_Actividad'],
                 'Estado_Actividad': r['Estado_Actividad'],
-                'Observaciones': r['Observaciones'],
-                'Comentarios_Suspension': r['Comentarios_Suspension'],
-                'Descripcion_Orden': r['Descripcion_Orden']
+                'Observaciones': r['Observaciones']
             })
 
     if rows_nodos:
         df_nodos_exp = pd.DataFrame(rows_nodos)
-        
-        # Filtro rápido por tipo de equipo o código específico
-        c_nd1, c_nd2 = st.columns([1, 1])
+        c_nd1, c_nd2 = st.columns(2)
         with c_nd1:
             tipos_eq = ["Todos"] + sorted(df_nodos_exp['Tipo_Equipo'].unique().tolist())
             sel_tipo_eq = st.selectbox("Filtrar por Familia de Equipo:", tipos_eq)
@@ -1060,47 +1271,18 @@ with tab_nodos:
         if buscar_nodo.strip():
             df_nodos_filt = df_nodos_filt[df_nodos_filt['Nodo_Equipo'].str.contains(buscar_nodo.strip().upper(), na=False)]
 
-        # Agrupar recurrencia por Nodo
         resumen_nodos = df_nodos_filt.groupby(['Nodo_Equipo', 'Tipo_Equipo', 'Sector', 'Zona_Oficial']).agg(
             Veces_Intervenido=('ID_Actividad', 'count'),
             Ordenes_Asociadas=('Orden_Trabajo', lambda s: ", ".join(sorted(set(s)))),
             Brigadas_Que_Asistieron=('Recurso', lambda s: ", ".join(sorted(set(s)))),
-            Fechas=('Fecha_Str', lambda s: ", ".join(sorted(set(s)))),
-            Estados=('Estado_Actividad', lambda s: ", ".join(sorted(set(s))))
+            Fechas=('Fecha_Str', lambda s: ", ".join(sorted(set(s))))
         ).reset_index().sort_values(by='Veces_Intervenido', ascending=False)
 
-        col_ng1, col_ng2 = st.columns([1.2, 1])
-        with col_ng1:
-            st.markdown("###### 🔥 Top 15 Nodos / Equipos con Mayor Reincidencia")
-            fig_nodos = px.bar(
-                resumen_nodos.head(15),
-                x='Veces_Intervenido',
-                y='Nodo_Equipo',
-                color='Tipo_Equipo',
-                orientation='h',
-                text='Veces_Intervenido',
-                hover_data=['Zona_Oficial', 'Brigadas_Que_Asistieron']
-            )
-            fig_nodos.update_traces(textposition='outside')
-            fig_nodos.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=10, b=10, l=10, r=40))
-            st.plotly_chart(fig_nodos, use_container_width=True)
-
-        with col_ng2:
-            st.markdown("###### 📊 Distribución por Tipo de Elemento de Red")
-            tipo_cnt = resumen_nodos.groupby('Tipo_Equipo')['Veces_Intervenido'].sum().reset_index()
-            fig_tp_nd = px.pie(tipo_cnt, values='Veces_Intervenido', names='Tipo_Equipo', hole=0.45)
-            fig_tp_nd.update_layout(height=360, margin=dict(t=10, b=10, l=10, r=10))
-            st.plotly_chart(fig_tp_nd, use_container_width=True)
-
-        st.markdown("###### 📋 Priorización de Nodos para Programar Visita Especializada")
         st.dataframe(resumen_nodos, use_container_width=True, hide_index=True)
-
-        with st.expander("🔎 Ver Detalle Técnico Completo de las Órdenes por Nodo"):
-            st.dataframe(df_nodos_filt, use_container_width=True, hide_index=True)
     else:
-        st.info("No se detectaron códigos de nodos (6..., PF..., RB..., RC..., CD..., S...) en la selección actual.")
+        st.info("No se detectaron códigos de nodos en la selección actual.")
 
-# ================= TAB 5: OBSERVACIONES Y AUDITORÍA DE CANCELADOS EGAM/RPA =================
+# ================= TAB 6: OBSERVACIONES Y AUDITORÍA DE CANCELADOS EGAM/RPA =================
 with tab_obs:
     st.markdown("##### 🚫 Auditoría de Actividades Canceladas: Gestión EGAM vs. Agrupación RPA vs. Operativo")
     df_canc_only = df_f[df_f['Estado_Actividad'].str.lower() == 'cancelada'].copy()
@@ -1116,36 +1298,26 @@ with tab_obs:
                 y='Responsable / Origen Cancelación',
                 orientation='h',
                 color='Responsable / Origen Cancelación',
-                text='Cantidad',
-                title="Clasificación de Canceladas (EGAM, RPA y Operativo)"
+                text='Cantidad'
             )
             fig_orig_c.update_traces(textposition='outside')
-            fig_orig_c.update_layout(yaxis=dict(autorange="reversed"), showlegend=False, height=320, margin=dict(t=35, b=10, l=10, r=40))
+            fig_orig_c.update_layout(yaxis=dict(autorange="reversed"), showlegend=False, height=300, margin=dict(t=10, b=10, l=10, r=40))
             st.plotly_chart(fig_orig_c, use_container_width=True)
 
         with col_c2:
             mot_counts = df_canc_only['Motivo_Cancelacion'].replace('', 'Sin Motivo').value_counts().head(10).reset_index()
             mot_counts.columns = ['Motivo Oficial WFM', 'Cantidad']
-            fig_mot_c = px.pie(mot_counts, values='Cantidad', names='Motivo Oficial WFM', hole=0.45, title="Motivo de Cancelación en Sistema")
-            fig_mot_c.update_layout(height=320, margin=dict(t=35, b=10, l=10, r=10))
+            fig_mot_c = px.pie(mot_counts, values='Cantidad', names='Motivo Oficial WFM', hole=0.45)
+            fig_mot_c.update_layout(height=300, margin=dict(t=10, b=10, l=10, r=10))
             st.plotly_chart(fig_mot_c, use_container_width=True)
-    else:
-        st.info("No hay actividades en estado 'Cancelada' dentro de los filtros actuales.")
 
     st.markdown("---")
     st.markdown("##### 🔎 Buscador Rápido por Orden de Trabajo, ID de Actividad y Observaciones")
-    
-    col_s1, col_s2, col_s3 = st.columns([1, 1, 1])
+    col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1:
-        buscar_ot_obs = st.text_input(
-            "📋 Buscar por Orden de Trabajo o ID Actividad:",
-            placeholder="Ej: 146616419 o ADMS-INC o 44532903..."
-        )
+        buscar_ot_obs = st.text_input("📋 Buscar por Orden de Trabajo o ID Actividad:", "")
     with col_s2:
-        palabra_clave = st.text_input(
-            "📝 Buscar palabra clave en Observaciones / Comentarios:",
-            placeholder="Ej: cañuela, vegetación, L.V, lluvias, EGAM, RPA..."
-        )
+        palabra_clave = st.text_input("📝 Buscar palabra clave en Observaciones / Comentarios:", "")
     with col_s3:
         orig_disp = ["Todos"] + sorted(df_f['Origen_Cancelacion'].unique().tolist())
         sel_orig_canc = st.selectbox("Filtrar por Origen de Cancelación:", orig_disp)
@@ -1169,31 +1341,16 @@ with tab_obs:
     if sel_orig_canc != "Todos":
         df_obs_view = df_obs_view[df_obs_view['Origen_Cancelacion'] == sel_orig_canc]
 
-    st.caption(f"Mostrando **{len(df_obs_view)}** registros coincidentes.")
-
     cols_obs_table = [c for c in [
         'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso',
         'Orden_Trabajo', 'ID_Actividad', 'Subtipo_Actividad',
-        'Estado_Actividad', 'Origen_Cancelacion', 'Nodos_Detectados',
-        'Etiqueta_Hallazgo', 'Observaciones',
-        'Comentarios_Cancelacion', 'Comentarios_Suspension', 'Descripcion_Orden'
+        'Estado_Actividad', 'Clasificacion_Jornada', 'Origen_Cancelacion', 'Nodos_Detectados',
+        'Observaciones', 'Comentarios_Cancelacion', 'Comentarios_Suspension', 'Descripcion_Orden'
     ] if c in df_obs_view.columns]
     
-    st.dataframe(
-        df_obs_view[cols_obs_table],
-        column_config={
-            "Fecha_Str": "Fecha",
-            "Orden_Trabajo": "Orden de Trabajo",
-            "ID_Actividad": "ID Actividad",
-            "Origen_Cancelacion": "Clasificación Cancelado",
-            "Nodos_Detectados": "Nodos / Equipos",
-            "Observaciones": st.column_config.TextColumn("Observaciones del Recurso", width="large")
-        },
-        use_container_width=True,
-        hide_index=True
-    )
+    st.dataframe(df_obs_view[cols_obs_table], use_container_width=True, hide_index=True)
 
-# ================= TAB 6: MAPA GEOGRÁFICO Y TRAZABILIDAD DE RUTA =================
+# ================= TAB 7: MAPA GEOGRÁFICO Y TRAZABILIDAD DE RUTA =================
 with tab_mapa:
     st.markdown("##### 📍 Georreferenciación, Buscador de OT y Trazabilidad de Ruta por Brigada")
     df_map = df_f.dropna(subset=['Lat', 'Lon']).copy()
@@ -1201,25 +1358,17 @@ with tab_mapa:
     if not df_map.empty:
         col_m1, col_m2, col_m3 = st.columns([1.2, 1.2, 1])
         with col_m1:
-            ot_texto_map = st.text_input(
-                "🔎 Buscar Orden de Trabajo o ID en el Mapa (Texto libre):",
-                placeholder="Escribe el número de OT o ID..."
-            )
+            ot_texto_map = st.text_input("🔎 Buscar Orden de Trabajo o ID en el Mapa:", "")
         with col_m2:
             lista_ots_mapa = ["Todas"] + sorted([
                 f"{r['Orden_Trabajo']} | ID:{r['ID_Actividad']} ({r['Recurso']})"
                 for _, r in df_map.iterrows()
             ])
-            sel_ot_dropdown = st.selectbox("📌 O selecciona una Orden específica de la lista:", lista_ots_mapa)
+            sel_ot_dropdown = st.selectbox("📌 O selecciona una Orden de la lista:", lista_ots_mapa)
         with col_m3:
             st.markdown("<br>", unsafe_allow_html=True)
-            ver_trazabilidad = st.checkbox(
-                "🛣️ Ver Trazabilidad / Orden de Atención",
-                value=False,
-                help="Ordena cronológicamente los avisos atendidos por la brigada y dibuja la ruta seguida."
-            )
+            ver_trazabilidad = st.checkbox("🛣️ Ver Trazabilidad / Orden de Atención", value=False)
 
-        # Aplicar filtro de búsqueda de OT en el mapa
         zoom_level = 8.5
         if ot_texto_map.strip():
             q_m = ot_texto_map.strip()
@@ -1234,158 +1383,50 @@ with tab_mapa:
                 df_map = df_map[df_map['ID_Actividad'] == id_sel.group(1)]
                 zoom_level = 14.5
 
-        if df_map.empty:
-            st.warning("No se encontraron coordenadas para esa Orden de Trabajo específica.")
-        else:
-            # Si se activa la trazabilidad, ordenar por Fecha e Inicio y calcular secuencia
+        if not df_map.empty:
             if ver_trazabilidad:
                 df_map['Hora_Orden'] = df_map['Inicio'].fillna('23:59').astype(str)
                 df_map = df_map.sort_values(by=['Recurso', 'Fecha_Str', 'Hora_Orden']).reset_index(drop=True)
                 df_map['Orden_Secuencia'] = df_map.groupby(['Recurso', 'Fecha_Str']).cumcount() + 1
                 df_map['Etiqueta_Parada'] = "Parada #" + df_map['Orden_Secuencia'].astype(str) + " (" + df_map['Inicio'].fillna('--:--').astype(str) + ")"
 
-            color_map_estados = {
-                'Finalizada': '#10b981',
-                'Cancelada': '#ef4444',
-                'Suspendida': '#f59e0b',
-                'No realizado': '#64748b'
-            }
-
-            hover_cols_map = ['Orden_Trabajo', 'ID_Actividad', 'Zona_Oficial', 'Subtipo_Actividad', 'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Nodos_Detectados', 'Observaciones']
+            color_map_estados = {'Finalizada': '#10b981', 'Cancelada': '#ef4444', 'Suspendida': '#f59e0b', 'No realizado': '#64748b'}
+            hover_cols_map = ['Orden_Trabajo', 'ID_Actividad', 'Zona_Oficial', 'Clasificacion_Jornada', 'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Nodos_Detectados', 'Observaciones']
             if ver_trazabilidad:
                 hover_cols_map = ['Etiqueta_Parada'] + hover_cols_map
 
-            # Renderizar mapa compatible con Plotly 5 y Plotly 6+
             if hasattr(px, "scatter_map"):
                 if ver_trazabilidad and len(df_map) > 1:
-                    fig_map = px.line_map(
-                        df_map,
-                        lat='Lat',
-                        lon='Lon',
-                        color='Recurso',
-                        hover_name='Etiqueta_Parada',
-                        hover_data=hover_cols_map,
-                        zoom=zoom_level,
-                        height=540
-                    )
+                    fig_map = px.line_map(df_map, lat='Lat', lon='Lon', color='Recurso', hover_name='Etiqueta_Parada', hover_data=hover_cols_map, zoom=zoom_level, height=540)
                     fig_map.update_traces(mode="lines+markers+text", text=df_map['Orden_Secuencia'].astype(str), textposition="top right")
                 else:
-                    fig_map = px.scatter_map(
-                        df_map,
-                        lat='Lat',
-                        lon='Lon',
-                        color='Estado_Actividad',
-                        hover_name='Recurso',
-                        hover_data=hover_cols_map,
-                        color_discrete_map=color_map_estados,
-                        zoom=zoom_level,
-                        height=540
-                    )
+                    fig_map = px.scatter_map(df_map, lat='Lat', lon='Lon', color='Estado_Actividad', hover_name='Recurso', hover_data=hover_cols_map, color_discrete_map=color_map_estados, zoom=zoom_level, height=540)
                 fig_map.update_layout(map_style="open-street-map", margin=dict(t=0, b=0, l=0, r=0))
             else:
                 if ver_trazabilidad and len(df_map) > 1:
-                    fig_map = px.line_mapbox(
-                        df_map,
-                        lat='Lat',
-                        lon='Lon',
-                        color='Recurso',
-                        hover_name='Etiqueta_Parada',
-                        hover_data=hover_cols_map,
-                        zoom=zoom_level,
-                        height=540
-                    )
+                    fig_map = px.line_mapbox(df_map, lat='Lat', lon='Lon', color='Recurso', hover_name='Etiqueta_Parada', hover_data=hover_cols_map, zoom=zoom_level, height=540)
                     fig_map.update_traces(mode="lines+markers+text", text=df_map['Orden_Secuencia'].astype(str), textposition="top right")
                 else:
-                    fig_map = px.scatter_mapbox(
-                        df_map,
-                        lat='Lat',
-                        lon='Lon',
-                        color='Estado_Actividad',
-                        hover_name='Recurso',
-                        hover_data=hover_cols_map,
-                        color_discrete_map=color_map_estados,
-                        zoom=zoom_level,
-                        height=540
-                    )
+                    fig_map = px.scatter_mapbox(df_map, lat='Lat', lon='Lon', color='Estado_Actividad', hover_name='Recurso', hover_data=hover_cols_map, color_discrete_map=color_map_estados, zoom=zoom_level, height=540)
                 fig_map.update_layout(mapbox_style="open-street-map", margin=dict(t=0, b=0, l=0, r=0))
 
             st.plotly_chart(fig_map, use_container_width=True)
 
             if ver_trazabilidad:
-                st.markdown("###### 🛣️ Secuencia Cronológica de Atención (Trazabilidad Paso a Paso)")
-                cols_traza = [
-                    'Orden_Secuencia', 'Recurso', 'Fecha_Str', 'Orden_Trabajo', 'ID_Actividad',
-                    'Subtipo_Actividad', 'Estado_Actividad', 'Hora_Asignacion', 'Inicio', 'Finalización',
-                    'Minutos_Viaje', 'Minutos_Duracion', 'Nodos_Detectados', 'Observaciones'
-                ]
-                st.dataframe(
-                    df_map[[c for c in cols_traza if c in df_map.columns]],
-                    column_config={
-                        "Orden_Secuencia": "Parada #",
-                        "Fecha_Str": "Fecha",
-                        "Orden_Trabajo": "Orden de Trabajo",
-                        "Minutos_Viaje": st.column_config.NumberColumn("Viaje (min)", format="%.0f"),
-                        "Minutos_Duracion": st.column_config.NumberColumn("Faena (min)", format="%.0f"),
-                        "Observaciones": st.column_config.TextColumn("Observaciones", width="large")
-                    },
-                    use_container_width=True,
-                    hide_index=True
-                )
-    else:
-        st.info("No se encontraron coordenadas geográficas válidas ('lat:...,lng:...') en los registros filtrados.")
+                st.dataframe(df_map[['Orden_Secuencia', 'Recurso', 'Fecha_Str', 'Orden_Trabajo', 'ID_Actividad', 'Clasificacion_Jornada', 'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Observaciones']], use_container_width=True, hide_index=True)
 
-# ================= TAB 7: BASE CONSOLIDADA Y AUDITORÍA =================
+# ================= TAB 8: BASE CONSOLIDADA Y AUDITORÍA =================
 with tab_datos:
-    st.markdown("##### 📋 Registros Consolidados con Orden de Trabajo, Nodos y Observaciones")
-    
+    st.markdown("##### 📋 Registros Consolidados con Clasificación de Turno, Orden de Trabajo, Nodos y Observaciones")
     cols_auditoria = [c for c in [
         'Fecha_Str', 'Anio', 'Mes_Nombre', 'Sector', 'Zona_Oficial', 'Recurso',
+        'Turno_Detectado_Dia', 'Clasificacion_Jornada', 'Entorno_Ubicacion',
         'Orden_Trabajo', 'ID_Actividad', 'Subtipo_Actividad', 'Estado_Actividad',
         'Origen_Cancelacion', 'Nodos_Detectados',
         'Hora_Asignacion', 'Inicio', 'Finalización',
         'Minutos_Reaccion', 'Minutos_Viaje', 'Minutos_Duracion',
         'Observaciones', 'Descripcion_Orden', 'Motivo_Cancelacion',
-        'Comentarios_Cancelacion', 'Comentarios_Suspension', 'Comentarios_No_Realizado', 'Zona_Trabajo_WFM'
+        'Comentarios_Cancelacion', 'Comentarios_Suspension'
     ] if c in df_f.columns]
     
-    st.dataframe(
-        df_f[cols_auditoria],
-        column_config={
-            "Fecha_Str": "Fecha",
-            "Anio": "Año",
-            "Mes_Nombre": "Mes",
-            "Zona_Oficial": "Zona Oficial",
-            "Orden_Trabajo": "Orden de Trabajo",
-            "ID_Actividad": "ID Actividad",
-            "Subtipo_Actividad": "Tipo Actividad.1",
-            "Estado_Actividad": "Estado",
-            "Origen_Cancelacion": "Origen Cancelado",
-            "Nodos_Detectados": "Nodos / Equipos",
-            "Minutos_Reaccion": st.column_config.NumberColumn("Reacción (min)", format="%.0f"),
-            "Minutos_Viaje": st.column_config.NumberColumn("Viaje (min)", format="%.0f"),
-            "Minutos_Duracion": st.column_config.NumberColumn("Duración (min)", format="%.0f"),
-            "Observaciones": st.column_config.TextColumn("Observaciones del Recurso", width="large")
-        },
-        use_container_width=True,
-        hide_index=True
-    )
-    
-    col_dl1, col_dl2 = st.columns(2)
-    with col_dl1:
-        csv_consolidado = df_f[cols_auditoria].to_csv(index=False).encode('utf-8-sig')
-        st.download_button(
-            label="📥 Descargar Registros Filtrados (CSV)",
-            data=csv_consolidado,
-            file_name="auditoria_actividades_bol.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-    with col_dl2:
-        csv_resumen = rec_stats.to_csv(index=False).encode('utf-8-sig')
-        st.download_button(
-            label="📥 Descargar Resumen por Brigada (CSV)",
-            data=csv_resumen,
-            file_name="resumen_brigadas_bol.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+    st.dataframe(df_f[cols_auditoria], use_container_width=True, hide_index=True)
