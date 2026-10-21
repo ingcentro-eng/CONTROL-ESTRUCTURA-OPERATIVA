@@ -78,28 +78,41 @@ st.markdown("""
         font-weight: 700;
         font-size: 0.75rem;
     }
-    .alert-banner {
-        background-color: #ffffff;
-        border-left: 5px solid #0f172a;
+    .alert-standby {
+        background-color: #fff7ed;
+        border-left: 5px solid #f97316;
         padding: 14px 18px;
         border-radius: 8px;
-        border-top: 1px solid #e2e8f0;
-        border-right: 1px solid #e2e8f0;
-        border-bottom: 1px solid #e2e8f0;
-        margin-bottom: 16px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        border-top: 1px solid #fed7aa;
+        border-right: 1px solid #fed7aa;
+        border-bottom: 1px solid #fed7aa;
+        margin-bottom: 14px;
+        color: #0f172a;
+        font-size: 0.9rem;
+    }
+    .alert-overtime {
+        background-color: #f5f3ff;
+        border-left: 5px solid #7c3aed;
+        padding: 14px 18px;
+        border-radius: 8px;
+        border-top: 1px solid #ddd6fe;
+        border-right: 1px solid #ddd6fe;
+        border-bottom: 1px solid #ddd6fe;
+        margin-bottom: 14px;
+        color: #0f172a;
+        font-size: 0.9rem;
     }
     .stTabs [data-baseweb="tab-list"] {
-        gap: 5px;
+        gap: 6px;
     }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
         border-radius: 6px;
-        padding: 8px 12px;
+        padding: 8px 14px;
         border: 1px solid #e2e8f0;
         font-weight: 600;
         color: #334155;
-        font-size: 0.82rem;
+        font-size: 0.84rem;
     }
     .stTabs [aria-selected="true"] {
         background-color: #0f172a !important;
@@ -169,7 +182,6 @@ MAESTRO_ZONAS = {
     "BOLM-350": ("NORTE", "MARIQUITA")
 }
 
-# Grupos de Reglas de Horario Oficial
 ROTATIVAS_3T_CENTRO = {"BOLG-332", "BOLV-330", "BOLV-333", "BOLV-336", "BOLV-394", "BOLV-397", "BOLV-399"}
 ROTATIVAS_2T_NORTE = {"BOLV-363", "BOLV-365"} # 06:00-14:00 y 14:00-22:00
 ROTATIVAS_3T_NORTE = {"BOLV-366", "BOLV-368", "BOLV-396"} # 06:00-14:00, 14:00-22:00, 22:00-06:00
@@ -254,24 +266,20 @@ def get_shift_profile(recurso_base: str):
     if recurso_base in BOLE_ESPECIALES:
         return ("L-V 07:30-16:30 (Enlace CELSIA)", "FIJO_BOLE", 7*60+30, 16*60+30, 8.0)
     if recurso_base == "BOLV-398":
-        return ("Fijo 08:00-16:00 (1h Alim.)", "FIJO", 8*60, 16*60, 7.0)
+        return ("Fijo 08:00-16:00 (7h netas)", "FIJO", 8*60, 16*60, 7.0)
     if recurso_base in {"BOLM-348", "BOLM-353"}:
-        return ("Fijo 09:00-17:00 (1h Alim.)", "FIJO", 9*60, 17*60, 7.0)
+        return ("Fijo 09:00-17:00 (7h netas)", "FIJO", 9*60, 17*60, 7.0)
     if recurso_base in ROTATIVAS_3T_CENTRO:
         return ("Rotativo 3T Urbano (6-14 / 14-22 / 22-6)", "ROTATIVO_3T", None, None, 8.0)
     if recurso_base in ROTATIVAS_2T_NORTE:
         return ("Rotativo 2T Norte (6-14 / 14-22)", "ROTATIVO_2T", None, None, 8.0)
     if recurso_base in ROTATIVAS_3T_NORTE:
         return ("Rotativo 3T Norte (6-14 / 14-22 / 22-6)", "ROTATIVO_3T", None, None, 8.0)
-    # Resto de Rurales Centro y Municipios Norte/Centro
-    return ("Fijo 07:00-15:00 (1h Alim.)", "FIJO", 7*60, 15*60, 7.0)
+    return ("Fijo 07:00-15:00 (7h netas)", "FIJO", 7*60, 15*60, 7.0)
 
 
 def infer_daily_shift_window(tipo_turno, min_ini_fijo, min_fin_fijo, mins_inicio_dia):
-    """
-    Determina la ventana de minutos (inicio, fin) del turno de ese día específico
-    para detectar actividades dentro de turno vs post-turno.
-    """
+    """Determina la ventana exacta (min_inicio, min_fin) del turno de ese día."""
     if tipo_turno in {"FIJO", "FIJO_BOLE"}:
         return min_ini_fijo, min_fin_fijo, f"{min_ini_fijo//60:02d}:{min_ini_fijo%60:02d} a {min_fin_fijo//60:02d}:{min_fin_fijo%60:02d}"
     
@@ -279,19 +287,17 @@ def infer_daily_shift_window(tipo_turno, min_ini_fijo, min_fin_fijo, mins_inicio
     first_m = min(valid_mins) if valid_mins else 360
 
     if tipo_turno == "ROTATIVO_2T":
-        # Turno Mañana (06:00 a 14:00) vs Turno Tarde (14:00 a 22:00)
-        if first_m < 12 * 60:
+        if first_m < 11 * 60 + 30:
             return 6*60, 14*60, "Turno 1 (06:00 a 14:00)"
         else:
             return 14*60, 22*60, "Turno 2 (14:00 a 22:00)"
 
     if tipo_turno == "ROTATIVO_3T":
-        # Detectar si es Turno 1 (6-14), Turno 2 (14-22) o Turno 3 (22-06)
         has_night = any(m >= 21*60 + 30 or m < 5*60 for m in valid_mins)
-        has_morning = any(5*60 <= m < 12*60 for m in valid_mins)
+        has_morning = any(5*60 <= m < 11*60 + 30 for m in valid_mins)
         if has_night and not has_morning:
             return 22*60, 30*60, "Turno 3 Nocturno (22:00 a 06:00)"
-        elif first_m < 12*60:
+        elif first_m < 11*60 + 30:
             return 6*60, 14*60, "Turno 1 Mañana (06:00 a 14:00)"
         else:
             return 14*60, 22*60, "Turno 2 Tarde (14:00 a 22:00)"
@@ -306,13 +312,10 @@ def classify_urban_vs_rural(row):
         return "🏙️ Ibagué Casco Urbano"
     
     txt = f"{row.get('Dirección', '')} {row.get('Descripcion_Orden', '')} {row.get('Observaciones', '')}".upper()
-    
-    # Indicadores de Vereda / Rural
     is_rural = any(k in txt for k in [
         "VDA", "VEREDA", "FCA", "FINCA", "HDA", "HACIENDA", "CORREGIMIENTO",
         "PARCELA", "SECTOR RURAL", "KMT", "KM ", "RAMAL", "CRUCE"
     ])
-    # Indicadores de Casco Urbano en Municipio
     is_urban = any(k in txt for k in [
         "CRA", "CARRERA", "CLL", "CALLE", "BARRIO", "B/ ", "B.", "CENTRO",
         "MZ", "MANZANA", "URB ", "URBANIZACION", "CONJUNTO", "DIAGONAL", "TRANSVERSAL", "APTO"
@@ -432,7 +435,10 @@ def classify_node_type(node_code: str) -> str:
 
 
 def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
-    """Estandariza columnas, asigna zonas, evalúa horarios por brigada y clasifica post-turno."""
+    """
+    Estandariza columnas, asigna zonas y calcula con corte exacto (0 minutos de holgura)
+    todo tiempo dentro de jornada vs tiempo extendido / post-turno (horas extras).
+    """
     if df.empty:
         return df
     
@@ -507,14 +513,13 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
     df['Tipo_Turno_Regla'] = tipos_turno
     df['Horas_Netas_Turno_Base'] = hrs_netas_base
 
-    # Procesar Fechas y Día de la semana (para BOLE L-V)
     if 'Fecha' in df.columns:
         fechas_dt = pd.to_datetime(df['Fecha'], errors='coerce')
         df['Fecha_Str'] = fechas_dt.dt.strftime('%Y-%m-%d').fillna('Sin Fecha')
         df['Anio'] = fechas_dt.dt.year.fillna(0).astype(int).astype(str).replace('0', 'Sin Año')
         df['Mes_Num'] = fechas_dt.dt.month.fillna(0).astype(int)
         df['Mes_Nombre'] = df['Mes_Num'].map(MESES_ES).fillna('Sin Mes')
-        df['Dia_Semana_Num'] = fechas_dt.dt.dayofweek.fillna(0).astype(int) # 5=Sábado, 6=Domingo
+        df['Dia_Semana_Num'] = fechas_dt.dt.dayofweek.fillna(0).astype(int)
     else:
         df['Fecha_Str'] = 'Sin Fecha'
         df['Anio'] = 'Sin Año'
@@ -555,34 +560,38 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
     df['Minutos_Reaccion'] = df.apply(calc_reaction_minutes, axis=1)
 
     # -------------------------------------------------------------------------
-    # EVALUACIÓN EXACTA DE JORNADA ORDINARIA VS EXTENSIÓN (CASO A) VS REACTIVACIÓN (CASO B)
+    # CÁLCULO EXACTO AL MINUTO DE JORNADA ORDINARIA VS TIEMPO EXTENDIDO / EXTRAS
     # -------------------------------------------------------------------------
     df['Clasificacion_Jornada'] = "En Jornada Ordinaria"
     df['Turno_Detectado_Dia'] = ""
+    df['Minutos_En_Jornada'] = 0.0
+    df['Minutos_Extra_PostTurno'] = 0.0
 
     for (rec, f_str), group in df.groupby(['Recurso', 'Fecha_Str']):
         rec_b = group['Recurso_Base'].iloc[0]
         _, t_turno, m_ini_fijo, m_fin_fijo, _ = get_shift_profile(rec_b)
         
-        # Determinar ventana de turno del día
         w_ini, w_fin, label_turno = infer_daily_shift_window(
             t_turno, m_ini_fijo, m_fin_fijo, group['Ini_Min_Dia'].tolist()
         )
         df.loc[group.index, 'Turno_Detectado_Dia'] = label_turno
 
-        # Verificar hora en que marcó 'Fin Turno' si existe
-        fin_turno_rows = group[group['Subtipo_Actividad'].str.upper() == 'FIN TURNO']
-        hora_marca_fin_turno = fin_turno_rows['Ini_Min_Dia'].dropna().min() if not fin_turno_rows['Ini_Min_Dia'].dropna().empty else np.nan
-
         for idx, r in group.iterrows():
-            # Caso especial BOLE en Sábado o Domingo
+            total_row_min = float(r['Minutos_Viaje'] + r['Minutos_Duracion'])
+
+            # Si es BOLE en Sábado o Domingo -> Todo es excepcional / extra
             if rec_b in BOLE_ESPECIALES and r['Dia_Semana_Num'] in [5, 6]:
                 df.loc[idx, 'Clasificacion_Jornada'] = "🚨 Caso Excepcional BOLE (Fin de Semana)"
+                df.loc[idx, 'Minutos_En_Jornada'] = 0.0
+                df.loc[idx, 'Minutos_Extra_PostTurno'] = total_row_min
                 continue
 
-            # Ignorar clasificación post-turno para actividades administrativas de cierre
-            if r['Categoria_Labor'] == 'Rutina / Administrativa':
-                df.loc[idx, 'Clasificacion_Jornada'] = "Rutina de Turno"
+            # Ignorar Fin Turno / Inicio Turno / Alimentación como horas extras operativas
+            sub_up = str(r['Subtipo_Actividad']).upper()
+            if sub_up in ["INICIO TURNO", "FIN TURNO", "ALIMENTACIÓN", "ALIMENTACION"]:
+                df.loc[idx, 'Clasificacion_Jornada'] = "En Jornada Ordinaria"
+                df.loc[idx, 'Minutos_En_Jornada'] = 0.0
+                df.loc[idx, 'Minutos_Extra_PostTurno'] = 0.0
                 continue
 
             ini_m = r['Ini_Min_Dia']
@@ -590,24 +599,38 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
 
             if pd.isna(ini_m) and pd.isna(fin_m):
                 df.loc[idx, 'Clasificacion_Jornada'] = "Sin Hora Inicio (Cancelada / Pendiente)"
+                df.loc[idx, 'Minutos_En_Jornada'] = 0.0
+                df.loc[idx, 'Minutos_Extra_PostTurno'] = 0.0
                 continue
 
-            # Para turnos nocturnos (22:00 a 06:00), están en turno
+            # Turno 3 Nocturno (22:00 a 06:00)
             if w_fin > 1440:
                 df.loc[idx, 'Clasificacion_Jornada'] = "En Jornada Ordinaria"
+                df.loc[idx, 'Minutos_En_Jornada'] = total_row_min
+                df.loc[idx, 'Minutos_Extra_PostTurno'] = 0.0
                 continue
 
-            # Evaluar si inició después del fin de su turno oficial (o en madrugada antes de entrar)
-            if pd.notna(ini_m) and (ini_m > w_fin + 10 or ini_m < w_ini - 60):
-                # Distinguir Caso B (Reactivación tras Fin Turno o >30 min después de salida) vs Caso A (Extensión continua)
-                if (pd.notna(hora_marca_fin_turno) and ini_m >= hora_marca_fin_turno) or (ini_m >= w_fin + 30) or (ini_m < w_ini - 60):
-                    df.loc[idx, 'Clasificacion_Jornada'] = "🌙 Caso B: Reactivación Post-Turno (Nuevo Llamado)"
-                else:
-                    df.loc[idx, 'Clasificacion_Jornada'] = "⏱️ Caso A: Extensión Continua de Turno"
-            elif pd.notna(fin_m) and fin_m > w_fin + 20:
-                df.loc[idx, 'Clasificacion_Jornada'] = "⏱️ Caso A: Extensión Continua de Turno"
+            # Regla estricta: TODO minuto después de w_fin (ej. 15:00 = 900) o antes de w_ini es Post-Turno / Extra
+            # Caso B: La actividad inicia en o después de la hora de salida (ini_m >= w_fin) o en madrugada antes del turno
+            if pd.notna(ini_m) and (ini_m >= w_fin or ini_m < w_ini - 30):
+                df.loc[idx, 'Clasificacion_Jornada'] = "🌙 Caso B: Reactivación Post-Turno (Inicia Después del Turno)"
+                df.loc[idx, 'Minutos_En_Jornada'] = 0.0
+                df.loc[idx, 'Minutos_Extra_PostTurno'] = total_row_min
+
+            # Caso A: La actividad inició dentro del turno (ini_m < w_fin), pero finalizó después de la hora de salida (fin_m > w_fin)
+            elif pd.notna(ini_m) and pd.notna(fin_m) and ini_m < w_fin and fin_m > w_fin:
+                df.loc[idx, 'Clasificacion_Jornada'] = "⏱️ Caso A: Tiempo Extendido (Cruza Hora Fin de Turno)"
+                # Minutos exactos después de la hora de cierre de turno
+                min_despues_cierre = float(fin_m - w_fin)
+                min_extra_calc = min(total_row_min, max(1.0, min_despues_cierre))
+                min_ord_calc = max(0.0, total_row_min - min_extra_calc)
+                df.loc[idx, 'Minutos_En_Jornada'] = min_ord_calc
+                df.loc[idx, 'Minutos_Extra_PostTurno'] = min_extra_calc
+
             else:
                 df.loc[idx, 'Clasificacion_Jornada'] = "En Jornada Ordinaria"
+                df.loc[idx, 'Minutos_En_Jornada'] = total_row_min
+                df.loc[idx, 'Minutos_Extra_PostTurno'] = 0.0
 
     # Coordenadas Geográficas
     lats, lons = [], []
@@ -673,7 +696,7 @@ def multiselect_with_all(label, options, key_prefix, default_all=True):
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("## ⚡ Control Operativo BOL")
-    st.caption("Gestión de Turnos, Standby y Trazabilidad")
+    st.caption("Gestión de Turnos, Standby y Horas Extras")
     st.markdown("---")
     
     st.markdown("**1. Enlace de Datos (Google Drive)**")
@@ -752,7 +775,7 @@ with st.sidebar:
     usar_horario_oficial = st.checkbox(
         "Usar Horario Oficial específico de cada Brigada (7h / 8h según turno)",
         value=True,
-        help="Aplica automáticamente: Rurales/Municipios 7h netas (7-15h), Urbanas/Rotativas 8h continuas, BOLM-353/348 (9-17h), BOLV-398 (8-16h), BOLE (7:30-16:30 L-V)."
+        help="Toma automáticamente el horario de cada brigada y contabiliza como Tiempo Extendido/Post-Turno todo minuto posterior a su hora de salida."
     )
     
     if not usar_horario_oficial:
@@ -776,6 +799,14 @@ with st.sidebar:
     
     sel_fechas = multiselect_with_all("Día(s) / Fecha(s):", df_f['Fecha_Str'].unique(), "fecha")
     df_f = df_f[df_f['Fecha_Str'].isin(sel_fechas)].copy()
+
+    # NUEVO FILTRO SOLICITADO DEBAJO DE DÍA(S) / FECHA(S)
+    sel_jornadas = multiselect_with_all(
+        "Franja / Condición de Jornada (Ordinaria vs. Post-Turno):",
+        df_f['Clasificacion_Jornada'].unique(),
+        "jornada"
+    )
+    df_f = df_f[df_f['Clasificacion_Jornada'].isin(sel_jornadas)].copy()
 
     st.markdown("---")
     st.markdown("**4. Filtros Geográficos y Operativos**")
@@ -804,7 +835,7 @@ with st.sidebar:
 
 
 # -----------------------------------------------------------------------------
-# 8. PROCESAMIENTO DE INDICADORES Y RESUMEN POR BRIGADA (CON HORARIOS OFICIALES)
+# 8. PROCESAMIENTO DE INDICADORES Y RESUMEN POR BRIGADA
 # -----------------------------------------------------------------------------
 if df_f.empty:
     st.warning("No hay actividades que coincidan con la combinación de filtros seleccionada.")
@@ -818,9 +849,9 @@ susp_act = int((df_f['Estado_Actividad'].str.lower() == 'suspendida').sum())
 canc_egam = int((df_f['Origen_Cancelacion'] == "🖥️ Cancelado por EGAM").sum())
 canc_rpa = int((df_f['Origen_Cancelacion'] == "🤖 Agrupación Automática RPA").sum())
 
-# Contadores de Post-Turno (Caso A y Caso B)
-caso_a_cnt = int((df_f['Clasificacion_Jornada'] == "⏱️ Caso A: Extensión Continua de Turno").sum())
-caso_b_cnt = int((df_f['Clasificacion_Jornada'] == "🌙 Caso B: Reactivación Post-Turno (Nuevo Llamado)").sum())
+caso_a_cnt = int((df_f['Clasificacion_Jornada'] == "⏱️ Caso A: Tiempo Extendido (Cruza Hora Fin de Turno)").sum())
+caso_b_cnt = int((df_f['Clasificacion_Jornada'] == "🌙 Caso B: Reactivación Post-Turno (Inicia Después del Turno)").sum())
+total_horas_extra_global = df_f['Minutos_Extra_PostTurno'].sum() / 60.0
 
 if excluir_rpa_egam_efectividad:
     denom_global = max(1, total_act - (canc_egam + canc_rpa))
@@ -834,7 +865,7 @@ prom_faena_global = df_f['Minutos_Duracion'].mean() if total_act > 0 else 0.0
 brigadas_activas = df_f['Recurso'].nunique()
 dias_unicos = df_f['Fecha_Str'].nunique()
 
-# Agrupación por Brigada separando Horas en Jornada Ordinaria vs Horas Post-Turno
+# Agrupación por Brigada
 rec_stats = df_f.groupby(['Recurso', 'Sector', 'Zona_Oficial', 'Regla_Horario', 'Horas_Netas_Turno_Base']).agg(
     Dias_Activos=('Fecha_Str', 'nunique'),
     Total_Asignadas=('ID_Actividad', 'count'),
@@ -844,16 +875,10 @@ rec_stats = df_f.groupby(['Recurso', 'Sector', 'Zona_Oficial', 'Regla_Horario', 
     Canc_RPA=('Origen_Cancelacion', lambda x: (x == "🤖 Agrupación Automática RPA").sum()),
     Suspendidas=('Estado_Actividad', lambda x: (x.str.lower() == 'suspendida').sum()),
     No_Realizadas=('Estado_Actividad', lambda x: (x.str.lower() == 'no realizado').sum()),
-    Min_Ord_Ocupado=('Minutos_Duracion', lambda s: (
-        s[df_f.loc[s.index, 'Clasificacion_Jornada'] == "En Jornada Ordinaria"].sum() +
-        df_f.loc[s.index][df_f.loc[s.index, 'Clasificacion_Jornada'] == "En Jornada Ordinaria"]['Minutos_Viaje'].sum()
-    )),
-    Min_Post_Turno=('Minutos_Duracion', lambda s: (
-        s[df_f.loc[s.index, 'Clasificacion_Jornada'].str.contains("Caso A|Caso B", na=False)].sum() +
-        df_f.loc[s.index][df_f.loc[s.index, 'Clasificacion_Jornada'].str.contains("Caso A|Caso B", na=False)]['Minutos_Viaje'].sum()
-    )),
-    Eventos_Reactivacion_B=('Clasificacion_Jornada', lambda x: (x == "🌙 Caso B: Reactivación Post-Turno (Nuevo Llamado)").sum()),
-    Eventos_Extension_A=('Clasificacion_Jornada', lambda x: (x == "⏱️ Caso A: Extensión Continua de Turno").sum()),
+    Min_Ord_Ocupado=('Minutos_En_Jornada', 'sum'),
+    Min_Post_Turno=('Minutos_Extra_PostTurno', 'sum'),
+    Eventos_Extension_A=('Clasificacion_Jornada', lambda x: (x == "⏱️ Caso A: Tiempo Extendido (Cruza Hora Fin de Turno)").sum()),
+    Eventos_Reactivacion_B=('Clasificacion_Jornada', lambda x: (x == "🌙 Caso B: Reactivación Post-Turno (Inicia Después del Turno)").sum()),
     Prom_Viaje_Min=('Minutos_Viaje', 'mean'),
     Prom_Faena_Min=('Minutos_Duracion', 'mean'),
     Prom_Reaccion_Min=('Minutos_Reaccion', 'mean')
@@ -887,7 +912,6 @@ def clasificar_semaforo(v):
 
 rec_stats['Semaforo'] = rec_stats['Efectividad_%'].apply(clasificar_semaforo)
 
-# Horas de turno disponibles según regla oficial de cada brigada (7h u 8h netas) o slider manual
 if usar_horario_oficial:
     rec_stats['Horas_Netas_Disponibles'] = (rec_stats['Dias_Turno_Real'].replace(0, 1) * rec_stats['Horas_Netas_Turno_Base']).round(2)
 else:
@@ -896,7 +920,7 @@ else:
 rec_stats['Horas_En_Jornada'] = (rec_stats['Min_Ord_Ocupado'] / 60.0).round(2)
 rec_stats['Horas_Post_Turno'] = (rec_stats['Min_Post_Turno'] / 60.0).round(2)
 
-# El Standby en jornada se mide exclusivamente contra las horas trabajadas DENTRO del turno ordinario
+# Standby medido estrictamente dentro de su turno oficial
 rec_stats['Horas_Sin_Atender'] = (rec_stats['Horas_Netas_Disponibles'] - rec_stats['Horas_En_Jornada']).apply(lambda x: max(0.0, round(x, 2)))
 rec_stats['Prom_Viaje_Min'] = rec_stats['Prom_Viaje_Min'].round(1)
 rec_stats['Prom_Faena_Min'] = rec_stats['Prom_Faena_Min'].round(1)
@@ -904,12 +928,12 @@ rec_stats['Prom_Reaccion_Min'] = rec_stats['Prom_Reaccion_Min'].fillna(0.0).roun
 
 
 # -----------------------------------------------------------------------------
-# 9. ENCABEZADO Y TARJETAS KPI PRINCIPALES
+# 9. ENCABEZADO, TARJETAS KPI Y BANNERS GEMELOS DE DIAGNÓSTICO (STANDBY + HORAS EXTRAS)
 # -----------------------------------------------------------------------------
 st.markdown("### ⚡ Centro de Control y Seguimiento Diario de Brigadas (BOL)")
 st.caption(
     f"Modo activo: **{modo_enfoque}** | Días evaluados: **{dias_unicos}** | "
-    f"Brigadas activas: **{brigadas_activas}** | Regla Horaria: **{'Oficial por Brigada (7h/8h)' if usar_horario_oficial else 'Manual'}**"
+    f"Brigadas activas: **{brigadas_activas}** | Horario: **{'Oficial por Brigada (Corte exacto fin de turno)' if usar_horario_oficial else 'Manual'}**"
 )
 
 k1, k2, k3, k4, k5, k6 = st.columns(6)
@@ -955,9 +979,9 @@ with k4:
 with k5:
     st.markdown(f"""
     <div class="metric-card">
-        <div class="metric-title">Salidas Post-Turno</div>
-        <div class="metric-value">{caso_b_cnt + caso_a_cnt}</div>
-        <div class="metric-sub">🌙 {caso_b_cnt} Reactivadas | ⏱️ {caso_a_cnt} Extensión</div>
+        <div class="metric-title">Tiempo Extendido / Extras</div>
+        <div class="metric-value">{total_horas_extra_global:.1f} <span style="font-size:1rem;color:#64748b;">hrs</span></div>
+        <div class="metric-sub">⏱️ {caso_a_cnt} Ext. | 🌙 {caso_b_cnt} Reactivadas</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -970,13 +994,50 @@ with k6:
     </div>
     """, unsafe_allow_html=True)
 
+# BANNERS GEMELOS EJECUTIVOS SIEMPRE VISIBLES ARRIBA
+if not rec_stats.empty:
+    col_al1, col_al2 = st.columns(2)
+    with col_al1:
+        top_sb = rec_stats.sort_values(by='Horas_Sin_Atender', ascending=False).iloc[0]
+        criticas_rojas = len(rec_stats[rec_stats['Efectividad_%'] < 50.0])
+        st.markdown(f"""
+        <div class="alert-standby">
+            ⚠️ <strong>Atención de Disponibilidad (Mayor Standby en Turno):</strong><br>
+            La brigada con más tiempo sin labor en su horario es <strong>{top_sb['Recurso']}</strong> ({top_sb['Zona_Oficial']} - {top_sb['Turno_Actual']}) 
+            con <strong>{top_sb['Horas_Sin_Atender']:.2f} horas</strong> disponibles sin actividad 
+            (Laboró {top_sb['Horas_En_Jornada']:.2f} h de {top_sb['Horas_Netas_Disponibles']:.1f} h netas). 
+            Brigadas en rojo (&lt;50%): <strong>{criticas_rojas}</strong>.
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_al2:
+        df_con_extra = rec_stats[rec_stats['Horas_Post_Turno'] > 0].sort_values(by='Horas_Post_Turno', ascending=False)
+        if not df_con_extra.empty:
+            top_ex = df_con_extra.iloc[0]
+            lista_brig_extra = ", ".join([f"{r['Recurso']} ({r['Horas_Post_Turno']:.1f}h)" for _, r in df_con_extra.head(5).iterrows()])
+            st.markdown(f"""
+            <div class="alert-overtime">
+                🌙 <strong>Control de Horas Extras / Tiempo Extendido Post-Turno:</strong><br>
+                Se registran <strong>{len(df_con_extra)} brigada(s)</strong> trabajando después de su hora de salida ({total_horas_extra_global:.2f} hrs totales). 
+                Mayor extensión: <strong>{top_ex['Recurso']}</strong> con <strong>{top_ex['Horas_Post_Turno']:.2f} h</strong> (cerró a las {top_ex['Ultimo_Fin']}).<br>
+                <span style="font-size:0.8rem;color:#4c1d95;">Top Brigadas Post-Turno: {lista_brig_extra}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="alert-overtime">
+                🌙 <strong>Control de Horas Extras / Tiempo Extendido Post-Turno:</strong><br>
+                Ninguna brigada en la selección actual supera su hora límite de salida de turno.
+            </div>
+            """, unsafe_allow_html=True)
+
 
 # -----------------------------------------------------------------------------
-# 10. PESTAÑAS DE NAVEGACIÓN PROFESIONAL (8 PESTAÑAS ESPECIALIZADAS)
+# 10. PESTAÑAS DE NAVEGACIÓN PROFESIONAL
 # -----------------------------------------------------------------------------
 tab_brigadas, tab_post, tab_zonas, tab_tiempos, tab_nodos, tab_obs, tab_mapa, tab_datos = st.tabs([
-    "👷 Brigadas y Standby (Turnos)",
-    "🌙 Post-Turno y Casco Urbano Municipios",
+    "👷 Control Brigadas, Standby y Extras",
+    "🌙 Auditoría Post-Turno y Casco Urbano",
     "🗺️ Desempeño Zonas Oficiales",
     "⏱️ Tiempos y Reacción",
     "⚡ Nodos Recurrentes",
@@ -985,7 +1046,7 @@ tab_brigadas, tab_post, tab_zonas, tab_tiempos, tab_nodos, tab_obs, tab_mapa, ta
     "📋 Base Consolidada"
 ])
 
-# ================= TAB 1: CONTROL DE BRIGADAS Y STANDBY (HORARIOS REALES) =================
+# ================= TAB 1: CONTROL DE BRIGADAS, STANDBY Y HORAS EXTRAS =================
 with tab_brigadas:
     col_b1, col_b2 = st.columns(2)
     
@@ -1004,40 +1065,36 @@ with tab_brigadas:
             labels={'Horas_Sin_Atender': 'Horas Sin Atender en Turno (Standby)', 'Recurso': 'Brigada'}
         )
         fig_sb.update_traces(texttemplate='%{text:.1f} h', textposition='outside')
-        fig_sb.update_layout(yaxis=dict(autorange="reversed"), height=400, margin=dict(t=10, b=10, l=10, r=40))
+        fig_sb.update_layout(yaxis=dict(autorange="reversed"), height=390, margin=dict(t=10, b=10, l=10, r=40))
         st.plotly_chart(fig_sb, use_container_width=True)
 
     with col_b2:
-        st.markdown("##### 🎯 Cumplimiento de Efectividad por Brigada (Semáforo Oficial ≥ 85%)")
-        df_top_ef = rec_stats.sort_values(by='Efectividad_%', ascending=True).head(15)
-        fig_ef = px.bar(
-            df_top_ef,
-            x='Efectividad_%',
-            y='Recurso',
-            color='Semaforo',
-            orientation='h',
-            text='Efectividad_%',
-            hover_data=['Zona_Oficial', 'Finalizadas', 'Total_Asignadas'],
-            color_discrete_map={
-                "🟢 >= 85% (Óptimo)": "#10b981",
-                "🟡 50% - 84% (Regular)": "#f59e0b",
-                "🔴 < 50% (Crítico)": "#ef4444"
-            },
-            labels={'Efectividad_%': '% Cumplimiento / Efectividad', 'Recurso': 'Brigada'}
-        )
-        fig_ef.add_vline(x=85, line_dash="dash", line_color="#166534", annotation_text="Meta 85%")
-        fig_ef.add_vline(x=50, line_dash="dot", line_color="#991b1b", annotation_text="Mín 50%")
-        fig_ef.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-        fig_ef.update_layout(height=400, margin=dict(t=10, b=10, l=10, r=40), legend=dict(orientation="h", y=1.1))
-        st.plotly_chart(fig_ef, use_container_width=True)
+        st.markdown("##### 🌙 Top Brigadas con Tiempo Extendido / Post-Turno (Soporte Horas Extras)")
+        df_top_ext = rec_stats[rec_stats['Horas_Post_Turno'] > 0].sort_values(by='Horas_Post_Turno', ascending=False).head(15)
+        if not df_top_ext.empty:
+            fig_ext = px.bar(
+                df_top_ext,
+                x='Horas_Post_Turno',
+                y='Recurso',
+                color='Zona_Oficial',
+                orientation='h',
+                text='Horas_Post_Turno',
+                hover_data=['Turno_Actual', 'Ultimo_Fin', 'Eventos_Extension_A', 'Eventos_Reactivacion_B'],
+                labels={'Horas_Post_Turno': 'Horas Después de Fin de Turno', 'Recurso': 'Brigada'}
+            )
+            fig_ext.update_traces(texttemplate='%{text:.2f} h', textposition='outside')
+            fig_ext.update_layout(yaxis=dict(autorange="reversed"), height=390, margin=dict(t=10, b=10, l=10, r=40))
+            st.plotly_chart(fig_ext, use_container_width=True)
+        else:
+            st.info("No hay brigadas con tiempo extendido posterior a su turno en los filtros actuales.")
 
-    st.markdown("##### 📊 Matriz Integral por Brigada (Con Regla de Turno Oficial, Standby en Jornada y Horas Post-Turno)")
+    st.markdown("##### 📊 Matriz Integral por Brigada (Jornada Ordinaria vs. Standby vs. Horas Extendidas Post-Turno)")
     cols_show_brig = [
         'Recurso', 'Sector', 'Zona_Oficial', 'Regla_Horario', 'Turno_Actual',
         'Semaforo', 'Efectividad_%', 'Total_Asignadas', 'Finalizadas', 'Fin_Por_Dia',
         'Canceladas', 'Canc_EGAM', 'Canc_RPA', 'Suspendidas',
         'Horas_Netas_Disponibles', 'Horas_En_Jornada', 'Horas_Sin_Atender',
-        'Horas_Post_Turno', 'Eventos_Reactivacion_B', 'Eventos_Extension_A',
+        'Horas_Post_Turno', 'Eventos_Extension_A', 'Eventos_Reactivacion_B',
         'Primer_Inicio', 'Ultimo_Fin'
     ]
     st.dataframe(
@@ -1045,7 +1102,7 @@ with tab_brigadas:
         column_config={
             "Zona_Oficial": "Zona Oficial",
             "Regla_Horario": "Esquema Turno",
-            "Turno_Actual": "Turno Detectado",
+            "Turno_Actual": "Turno Día",
             "Semaforo": "Estado Meta",
             "Efectividad_%": st.column_config.ProgressColumn("Efectividad", format="%.1f%%", min_value=0, max_value=100),
             "Total_Asignadas": "Asig.",
@@ -1055,46 +1112,75 @@ with tab_brigadas:
             "Horas_Netas_Disponibles": st.column_config.NumberColumn("Turno Neto", format="%.1f h"),
             "Horas_En_Jornada": st.column_config.NumberColumn("Hrs en Turno", format="%.2f h"),
             "Horas_Sin_Atender": st.column_config.NumberColumn("Hrs Standby", format="%.2f h"),
-            "Horas_Post_Turno": st.column_config.NumberColumn("Hrs Post-Turno", format="%.2f h"),
+            "Horas_Post_Turno": st.column_config.NumberColumn("Hrs Post-Turno (Extras)", format="%.2f h"),
+            "Eventos_Extension_A": "Extens. (Caso A)",
             "Eventos_Reactivacion_B": "Reactiv. (Caso B)",
-            "Eventos_Extension_A": "Extens. (Caso A)"
+            "Primer_Inicio": "1er Inicio",
+            "Ultimo_Fin": "Último Cierre"
         },
         use_container_width=True,
         hide_index=True
     )
 
-# ================= TAB 2: POST-TURNO Y CASCO URBANO DE MUNICIPIOS =================
-with tab_post:
-    st.markdown("##### 🌙 Control de Salidas Post-Turno (Caso A: Extensión Continua vs. Caso B: Reactivación / Llamado Nocturno)")
-    st.caption("Distingue si la brigada se extendió terminando un daño de su turno (Caso A) o si ya había cerrado turno y fue reactivada para atender un evento (Caso B).")
+    # Resumen directo de órdenes con tiempo extendido en la misma Pestaña 1 para visualización inmediata
+    df_post_inline = df_f[df_f['Minutos_Extra_PostTurno'] > 0].copy()
+    if not df_post_inline.empty:
+        st.markdown("##### 🕒 Relación Directa de Actividades con Tiempo Extendido / Post-Turno (Soporte para Cliente y Horas Extras)")
+        df_post_inline['Horas_Extra_Orden'] = (df_post_inline['Minutos_Extra_PostTurno'] / 60.0).round(2)
+        cols_inline = [
+            'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Turno_Detectado_Dia',
+            'Clasificacion_Jornada', 'Entorno_Ubicacion', 'Orden_Trabajo', 'ID_Actividad',
+            'Subtipo_Actividad', 'Estado_Actividad', 'Inicio', 'Finalización',
+            'Minutos_En_Jornada', 'Minutos_Extra_PostTurno', 'Horas_Extra_Orden', 'Observaciones'
+        ]
+        st.dataframe(
+            df_post_inline[[c for c in cols_inline if c in df_post_inline.columns]].sort_values(by='Minutos_Extra_PostTurno', ascending=False),
+            column_config={
+                "Fecha_Str": "Fecha",
+                "Turno_Detectado_Dia": "Horario Turno",
+                "Clasificacion_Jornada": "Tipo Extensión",
+                "Entorno_Ubicacion": "Ubicación",
+                "Minutos_En_Jornada": st.column_config.NumberColumn("Min. en Turno", format="%.0f m"),
+                "Minutos_Extra_PostTurno": st.column_config.NumberColumn("Min. Post-Turno", format="%.0f m"),
+                "Horas_Extra_Orden": st.column_config.NumberColumn("Horas Extras Orden", format="%.2f h"),
+                "Observaciones": st.column_config.TextColumn("Observaciones", width="large")
+            },
+            use_container_width=True,
+            hide_index=True
+        )
 
-    df_post = df_f[df_f['Clasificacion_Jornada'].str.contains("Caso A|Caso B|Excepcional", na=False)].copy()
+# ================= TAB 2: AUDITORÍA POST-TURNO Y CASCO URBANO DE MUNICIPIOS =================
+with tab_post:
+    st.markdown("##### 🌙 Auditoría Detallada de Tiempo Extendido (Caso A) vs. Reactivación Post-Turno (Caso B) y Casco Urbano")
+    df_post = df_f[df_f['Minutos_Extra_PostTurno'] > 0].copy()
 
     col_p1, col_p2 = st.columns(2)
     with col_p1:
         if not df_post.empty:
-            post_cnt = df_post.groupby(['Recurso', 'Clasificacion_Jornada']).size().reset_index(name='Eventos')
+            post_grp = df_post.groupby(['Recurso', 'Clasificacion_Jornada'])['Minutos_Extra_PostTurno'].sum().reset_index()
+            post_grp['Horas_Extra'] = (post_grp['Minutos_Extra_PostTurno'] / 60.0).round(2)
             fig_post = px.bar(
-                post_cnt,
-                x='Eventos',
+                post_grp.sort_values(by='Horas_Extra', ascending=False),
+                x='Horas_Extra',
                 y='Recurso',
                 color='Clasificacion_Jornada',
                 orientation='h',
                 barmode='stack',
-                title="Brigadas con Actividad Fuera de su Horario Ordinario",
+                text='Horas_Extra',
+                title="Horas Extendidas / Post-Turno por Brigada (Caso A vs. Caso B)",
                 color_discrete_map={
-                    "🌙 Caso B: Reactivación Post-Turno (Nuevo Llamado)": "#7c3aed",
-                    "⏱️ Caso A: Extensión Continua de Turno": "#f59e0b",
+                    "🌙 Caso B: Reactivación Post-Turno (Inicia Después del Turno)": "#7c3aed",
+                    "⏱️ Caso A: Tiempo Extendido (Cruza Hora Fin de Turno)": "#f59e0b",
                     "🚨 Caso Excepcional BOLE (Fin de Semana)": "#ef4444"
                 }
             )
-            fig_post.update_layout(yaxis=dict(autorange="reversed"), height=350, margin=dict(t=35, b=10, l=10, r=10), legend=dict(orientation="h", y=1.15))
+            fig_post.update_traces(texttemplate='%{text:.2f} h', textposition='outside')
+            fig_post.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=35, b=10, l=10, r=40), legend=dict(orientation="h", y=1.15))
             st.plotly_chart(fig_post, use_container_width=True)
         else:
-            st.info("No se registran salidas post-turno en la selección actual.")
+            st.info("No se registran horas post-turno en la selección actual.")
 
     with col_p2:
-        # Avisos en Municipios (Excluyendo Ibagué Urbana) clasificados en Casco Urbano vs Veredal
         df_muni_urb = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()
         if not df_muni_urb.empty:
             urb_cnt = df_muni_urb.groupby(['Zona_Oficial', 'Entorno_Ubicacion']).size().reset_index(name='Cantidad')
@@ -1111,43 +1197,36 @@ with tab_post:
                     "📍 General Municipio": "#94a3b8"
                 }
             )
-            fig_urb.update_layout(height=350, margin=dict(t=35, b=10, l=10, r=10), legend=dict(orientation="h", y=1.15))
+            fig_urb.update_layout(height=360, margin=dict(t=35, b=10, l=10, r=10), legend=dict(orientation="h", y=1.15))
             st.plotly_chart(fig_urb, use_container_width=True)
         else:
             st.info("Selecciona zonas de municipios para ver la proporción Casco Urbano vs. Vereda.")
 
-    st.markdown("###### 📋 Detalle de Eventos Post-Turno (Reactivaciones Caso B y Extensiones Caso A)")
-    if not df_post.empty:
-        cols_post_tbl = [
-            'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Turno_Detectado_Dia',
-            'Clasificacion_Jornada', 'Entorno_Ubicacion', 'Orden_Trabajo', 'ID_Actividad',
-            'Subtipo_Actividad', 'Estado_Actividad', 'Hora_Asignacion', 'Inicio', 'Finalización',
-            'Minutos_Viaje', 'Minutos_Duracion', 'Observaciones', 'Descripcion_Orden'
-        ]
-        st.dataframe(
-            df_post[[c for c in cols_post_tbl if c in df_post.columns]],
-            use_container_width=True,
-            hide_index=True
-        )
-
     st.markdown("---")
-    st.markdown("###### 🏘️ Buscador y Monitor de Avisos Atendidos en el Casco Urbano de los Municipios")
-    f_entorno = st.radio(
-        "Filtrar avisos de Municipios por tipo de ubicación:",
-        options=["Todos los de Municipios", "Solo 🏘️ Casco Urbano Municipio", "Solo 🌲 Zona Veredal / Rural"],
-        horizontal=True
-    )
+    st.markdown("###### 🏘️ Monitor de Avisos Atendidos en el Casco Urbano de los Municipios y Veredas")
+    c_u1, c_u2 = st.columns(2)
+    with c_u1:
+        f_entorno = st.radio(
+            "Filtrar por Ubicación en Municipios:",
+            options=["Todos los de Municipios", "Solo 🏘️ Casco Urbano Municipio", "Solo 🌲 Zona Veredal / Rural"],
+            horizontal=True
+        )
+    with c_u2:
+        solo_post_muni = st.checkbox("Ver únicamente avisos que superaron el horario de turno (Post-Turno / Extras)", value=False)
+
     df_muni_view = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()
     if f_entorno == "Solo 🏘️ Casco Urbano Municipio":
         df_muni_view = df_muni_view[df_muni_view['Entorno_Ubicacion'] == "🏘️ Casco Urbano Municipio"]
     elif f_entorno == "Solo 🌲 Zona Veredal / Rural":
         df_muni_view = df_muni_view[df_muni_view['Entorno_Ubicacion'] == "🌲 Zona Veredal / Rural"]
+    if solo_post_muni:
+        df_muni_view = df_muni_view[df_muni_view['Minutos_Extra_PostTurno'] > 0]
 
     cols_muni_tbl = [
-        'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Entorno_Ubicacion',
-        'Clasificacion_Jornada', 'Orden_Trabajo', 'ID_Actividad', 'Estado_Actividad',
-        'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Dirección',
-        'Descripcion_Orden', 'Observaciones'
+        'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Turno_Detectado_Dia',
+        'Clasificacion_Jornada', 'Entorno_Ubicacion', 'Orden_Trabajo', 'ID_Actividad',
+        'Estado_Actividad', 'Inicio', 'Finalización', 'Minutos_En_Jornada',
+        'Minutos_Extra_PostTurno', 'Dirección', 'Descripcion_Orden', 'Observaciones'
     ]
     st.dataframe(
         df_muni_view[[c for c in cols_muni_tbl if c in df_muni_view.columns]],
@@ -1165,6 +1244,7 @@ with tab_zonas:
         Suspendidas=('Estado_Actividad', lambda x: (x.str.lower() == 'suspendida').sum()),
         Horas_Viaje=('Minutos_Viaje', lambda x: round(x.sum() / 60.0, 2)),
         Horas_Faena=('Minutos_Duracion', lambda x: round(x.sum() / 60.0, 2)),
+        Horas_Extras_Zona=('Minutos_Extra_PostTurno', lambda x: round(x.sum() / 60.0, 2)),
         Prom_Viaje_Min=('Minutos_Viaje', lambda x: round(x.mean(), 1)),
         Prom_Faena_Min=('Minutos_Duracion', lambda x: round(x.mean(), 1))
     ).reset_index()
@@ -1185,13 +1265,13 @@ with tab_zonas:
         st.plotly_chart(fig_z_vol, use_container_width=True)
 
     with col_z2:
-        st.markdown("##### 🚗 Comparativa por Zona: Horas en Ruta vs. Horas en Faena")
+        st.markdown("##### 🚗 Comparativa por Zona: Horas en Ruta vs. Horas en Faena vs. Horas Extras")
         fig_z_time = px.bar(
             zona_summary,
             x='Zona_Oficial',
-            y=['Horas_Viaje', 'Horas_Faena'],
+            y=['Horas_Viaje', 'Horas_Faena', 'Horas_Extras_Zona'],
             barmode='group',
-            color_discrete_map={'Horas_Viaje': '#3b82f6', 'Horas_Faena': '#0f172a'}
+            color_discrete_map={'Horas_Viaje': '#3b82f6', 'Horas_Faena': '#0f172a', 'Horas_Extras_Zona': '#7c3aed'}
         )
         fig_z_time.update_layout(height=380, margin=dict(t=10, b=10, l=10, r=10), legend=dict(orientation="h", y=1.1))
         st.plotly_chart(fig_z_time, use_container_width=True)
@@ -1417,7 +1497,7 @@ with tab_mapa:
 
 # ================= TAB 8: BASE CONSOLIDADA Y AUDITORÍA =================
 with tab_datos:
-    st.markdown("##### 📋 Registros Consolidados con Clasificación de Turno, Orden de Trabajo, Nodos y Observaciones")
+    st.markdown("##### 📋 Registros Consolidados con Clasificación de Turno, Horas Extras, Orden de Trabajo, Nodos y Observaciones")
     cols_auditoria = [c for c in [
         'Fecha_Str', 'Anio', 'Mes_Nombre', 'Sector', 'Zona_Oficial', 'Recurso',
         'Turno_Detectado_Dia', 'Clasificacion_Jornada', 'Entorno_Ubicacion',
@@ -1425,8 +1505,29 @@ with tab_datos:
         'Origen_Cancelacion', 'Nodos_Detectados',
         'Hora_Asignacion', 'Inicio', 'Finalización',
         'Minutos_Reaccion', 'Minutos_Viaje', 'Minutos_Duracion',
+        'Minutos_En_Jornada', 'Minutos_Extra_PostTurno',
         'Observaciones', 'Descripcion_Orden', 'Motivo_Cancelacion',
         'Comentarios_Cancelacion', 'Comentarios_Suspension'
     ] if c in df_f.columns]
     
     st.dataframe(df_f[cols_auditoria], use_container_width=True, hide_index=True)
+    
+    col_dl1, col_dl2 = st.columns(2)
+    with col_dl1:
+        csv_consolidado = df_f[cols_auditoria].to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 Descargar Registros Filtrados (CSV)",
+            data=csv_consolidado,
+            file_name="auditoria_actividades_bol.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    with col_dl2:
+        csv_resumen = rec_stats.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 Descargar Resumen de Brigadas, Standby y Extras (CSV)",
+            data=csv_resumen,
+            file_name="resumen_brigadas_bol.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
