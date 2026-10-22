@@ -182,10 +182,10 @@ MAESTRO_ZONAS = {
     "BOLM-350": ("NORTE", "MARIQUITA")
 }
 
-ROTATIVAS_3T_CENTRO = {"BOLG-332", "BOLV-330", "BOLV-333", "BOLV-336", "BOLV-394", "BOLV-397", "BOLV-399"}
-ROTATIVAS_2T_NORTE = {"BOLV-363", "BOLV-365"} # 06:00-14:00 y 14:00-22:00
-ROTATIVAS_3T_NORTE = {"BOLV-366", "BOLV-368", "BOLV-396"} # 06:00-14:00, 14:00-22:00, 22:00-06:00
-BOLE_ESPECIALES = {"BOLE-990", "BOLE-999"} # L-V 07:30-16:30
+ROTATIVAS_3T_CENTRO = {"BOLG-332", "BOLV-330", "BOLV-333", "BOLV-336", "BOLV-394", "BOLV-397", "BOLV-399"}  #[cite: 1]
+ROTATIVAS_2T_NORTE = {"BOLV-363", "BOLV-365"}  # 06:00-14:00 y 14:00-22:00[cite: 1]
+ROTATIVAS_3T_NORTE = {"BOLV-366", "BOLV-368", "BOLV-396"}  # 06:00-14:00, 14:00-22:00, 22:00-06:00[cite: 1]
+BOLE_ESPECIALES = {"BOLE-990", "BOLE-999"}  # L-V 07:30-16:30[cite: 1]
 
 MESES_ES = {
     1: "01 - Enero", 2: "02 - Febrero", 3: "03 - Marzo", 4: "04 - Abril",
@@ -274,9 +274,9 @@ def get_shift_profile(recurso_base: str):
     """Retorna la regla de horario oficial de cada brigada."""
     if recurso_base in BOLE_ESPECIALES:
         return ("L-V 07:30-16:30 (Enlace CELSIA)", "FIJO_BOLE", 7*60+30, 16*60+30, 8.0)
-    if recurso_base == "BOLV-398":
+    if recurso_base == "BOLV-398":  #[cite: 1]
         return ("Fijo 08:00-16:00 (7h netas)", "FIJO", 8*60, 16*60, 7.0)
-    if recurso_base in {"BOLM-348", "BOLM-353"}:
+    if recurso_base in {"BOLM-348", "BOLM-353"}:  #[cite: 1]
         return ("Fijo 09:00-17:00 (7h netas)", "FIJO", 9*60, 17*60, 7.0)
     if recurso_base in ROTATIVAS_3T_CENTRO:
         return ("Rotativo 3T Urbano (6-14 / 14-22 / 22-6)", "ROTATIVO_3T", None, None, 8.0)
@@ -317,7 +317,7 @@ def infer_daily_shift_window(tipo_turno, min_ini_fijo, min_fin_fijo, mins_inicio
 def classify_urban_vs_rural(row):
     """Clasifica si el aviso atendido es en Casco Urbano del Municipio o en Vereda/Rural."""
     zona_of = str(row.get('Zona_Oficial', '')).upper()
-    if zona_of == "IBAGUE URBANA":
+    if zona_of == "IBAGUE URBANA":  #[cite: 1]
         return "🏙️ Ibagué Casco Urbano"
     
     txt = f"{row.get('Dirección', '')} {row.get('Descripcion_Orden', '')} {row.get('Observaciones', '')}".upper()
@@ -334,7 +334,7 @@ def classify_urban_vs_rural(row):
         return "🏘️ Casco Urbano Municipio"
     if is_rural:
         return "🌲 Zona Veredal / Rural"
-    if zona_of == "IBAGUE RURAL":
+    if zona_of == "IBAGUE RURAL":  #[cite: 1]
         return "🌲 Zona Veredal / Rural"
     return "📍 General Municipio"
 
@@ -408,28 +408,20 @@ def detect_root_causes_multicausal(row):
         return ["🔍 Operación / Sin Causa Explícita"]
     
     causas = []
-    # 1. Vegetación / Árboles
     if any(k in t for k in ["VEGETACION", "VEGETACIÓN", "ARBOL", "ÁRBOL", "RAMA", "GUADUA", "PALMA", "PODA", "MALEZA", "CHAMIZA", "BAMBU", "BAMBÚ"]):
         causas.append("🌿 Vegetación / Árboles")
-    # 2. Lluvias / Mal Tiempo
     if any(k in t for k in ["LLUVIA", "TORMENTA", "AGUACERO", "INVIERNO", "MAL TIEMPO", "BORRASCA", "VENDAVAL", "INUNDACION"]):
         causas.append("🌧️ Lluvias / Mal Tiempo")
-    # 3. Fuertes Vientos
     if any(k in t for k in ["VIENTO", "VIENTOS", "VENTARRON", "VENTARRÓN", "BRISA FUERTE"]):
         causas.append("💨 Fuertes Vientos")
-    # 4. Descargas Atmosféricas
     if any(k in t for k in ["DESCARGA", "RAYO", "ATMOSFERICA", "ATMOSFÉRICA", "TRUENO", "DPS", "PARARRAYO"]):
         causas.append("⚡ Descargas Atmosféricas")
-    # 5. Animales / Fauna
     if any(k in t for k in ["ANIMAL", "AVE ", "AVES", "PAJARO", "PÁJARO", "ARDILLA", "IGUANA", "SERPIENTE", "CULEBRA", "GATO", "ZARIGÜEYA", "CHUCHA", "MONO", "GARZA", "GALLINAZO", "NIDO"]):
         causas.append("🐾 Animales / Fauna")
-    # 6. Terceros / Vehículos
     if any(k in t for k in ["VEHICULO", "VEHÍCULO", "CAMION", "CAMIÓN", "CARRO", "TERCERO", "VANDALISMO", "HURTO", "ROBO", "CHOQUE", "ESTRELL", "GRUA", "GRÚA", "VOLQUETA", "RETRO", "COMETA"]):
         causas.append("🚗 Terceros / Vehículos")
-    # 7. Deterioro / Falla de Material o Equipo MT
     if any(k in t for k in ["PUNTO CALIENTE", "AISLADOR", "PIN DE PORCELANA", "SULFATA", "DETERIOR", "MAL ESTADO", "FATIGA", "QUEMAD", "ROTO", "REVENTAD", "CUERDA CAIDA", "CUERDAS CAIDAS", "VELA CAIDA", "VELAS CAIDAS", "CAÑUELA", "CORTACIRCUITO"]):
         causas.append("🔧 Deterioro / Falla de Material")
-    # 8. Variación de Voltaje / Acometida / BT
     if any(k in t for k in ["VOLTAJE", "SUBE Y BAJA", "BORNERA", "ACOMETIDA", "MEDIDOR"]):
         causas.append("🔌 Variación Voltaje / Acometida BT")
 
@@ -666,7 +658,6 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
     df['Origen_Cancelacion'] = df.apply(classify_cancelacion, axis=1)
     df['Entorno_Ubicacion'] = df.apply(classify_urban_vs_rural, axis=1)
 
-    # Nodos y Causas Raíz Multicausales
     df['Lista_Nodos'] = df.apply(extract_nodes_preserve_exact, axis=1)
     df['Nodos_Detectados'] = df['Lista_Nodos'].apply(lambda lst: ", ".join(lst) if lst else "")
     df['Lista_Causas_Raiz'] = df.apply(detect_root_causes_multicausal, axis=1)
@@ -938,7 +929,6 @@ with st.sidebar:
     sel_estados = multiselect_with_all("Estado(s) de Actividad:", df_f['Estado_Actividad'].unique(), "estado")
     df_f = df_f[df_f['Estado_Actividad'].isin(sel_estados)].copy()
 
-    # Filtro global opcional por Causa Raíz
     todas_causas_disp = sorted(list({c for lst in df_f['Lista_Causas_Raiz'] for c in lst}))
     sel_causas_global = multiselect_with_all("Causa(s) Raíz Detectadas:", todas_causas_disp, "causas_glob")
     if len(sel_causas_global) < len(todas_causas_disp):
@@ -1292,7 +1282,7 @@ with tab_post:
             st.info("No se registran horas post-turno en la selección actual.")
 
     with col_p2:
-        df_muni_urb = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()
+        df_muni_urb = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()  #[cite: 1]
         if not df_muni_urb.empty:
             urb_cnt = df_muni_urb.groupby(['Zona_Oficial', 'Entorno_Ubicacion']).size().reset_index(name='Cantidad')
             fig_urb = px.bar(
@@ -1325,7 +1315,7 @@ with tab_post:
     with c_u2:
         solo_post_muni = st.checkbox("Ver únicamente avisos que superaron el horario de turno (Post-Turno / Extras)", value=False)
 
-    df_muni_view = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()
+    df_muni_view = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()  #[cite: 1]
     if f_entorno == "Solo 🏘️ Casco Urbano Municipio":
         df_muni_view = df_muni_view[df_muni_view['Entorno_Ubicacion'] == "🏘️ Casco Urbano Municipio"]
     elif f_entorno == "Solo 🌲 Zona Veredal / Rural":
@@ -1389,7 +1379,7 @@ with tab_zonas:
 
     st.dataframe(zona_summary, use_container_width=True, hide_index=True)
 
-# ================= TAB 4: COLA EGAM, GANTT HORARIO Y DISCIPLINA WFM =================
+# ================= TAB 4: COLA EGAM, GANTT HORARIO Y DISCIPLINA WFM (CORREGIDO Y SEPARADO) =================
 with tab_tiempos:
     st.markdown("##### ⏳ Mejora A: Desglose de Demora — Cola de Despacho EGAM (Generación ➔ Asignación) vs. Reacción Brigada (Asignación ➔ Inicio)")
     col_t1, col_t2 = st.columns(2)
@@ -1452,25 +1442,78 @@ with tab_tiempos:
         st.info("No hay horas de Inicio y Finalización válidas para construir el diagrama de Gantt.")
 
     st.markdown("---")
-    st.markdown("##### 🛡️ Mejora C: Auditoría de Disciplina en el Aplicativo WFM (Cierres Pendientes y Descargos)")
+    st.markdown("##### 🛡️ Mejora C: Auditoría de Disciplina en el Aplicativo WFM y Rezagos Operativos")
+    
+    # FILA 1 DE AUDITORÍA: RUTINAS ESTRICTAMENTE EN PENDIENTE VS ANOMALÍAS DE RUTINA (CANCELADAS/SUSPENDIDAS)
     col_w1, col_w2 = st.columns(2)
     with col_w1:
-        st.markdown("###### ⚠️ Rutinas Abiertas (`Inicio Turno`, `Alimentación` o `Fin Turno` en Estado Pendiente)")
-        rutinas_abiertas = df_contexto_turno[
+        st.markdown("###### ⚠️ 1. Rutinas Abiertas sin Cerrar (Únicamente en Estado `Pendiente`)")
+        rutinas_pendientes = df_contexto_turno[
             (df_contexto_turno['Subtipo_Actividad'].str.upper().isin(['INICIO TURNO', 'FIN TURNO', 'ALIMENTACIÓN', 'ALIMENTACION'])) &
-            (df_contexto_turno['Estado_Actividad'].str.lower() != 'finalizada')
+            (df_contexto_turno['Estado_Actividad'].str.lower().isin(['pendiente', 'iniciada', 'en ruta']))
         ]
-        if not rutinas_abiertas.empty:
+        if not rutinas_pendientes.empty:
+            st.warning(f"Se detectaron **{len(rutinas_pendientes)}** rutinas de turno que el recurso dejó abiertas en estado Pendiente:")
             st.dataframe(
-                rutinas_abiertas[['Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Subtipo_Actividad', 'Estado_Actividad', 'Inicio', 'Finalización']],
+                rutinas_pendientes[['Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Subtipo_Actividad', 'Estado_Actividad', 'Inicio', 'Finalización']],
                 use_container_width=True,
                 hide_index=True
             )
         else:
-            st.success("✅ Todas las brigadas cerraron correctamente su Inicio Turno, Alimentación y Fin Turno.")
+            st.success("✅ Ninguna brigada dejó su Inicio Turno, Alimentación o Fin Turno abierto en estado Pendiente.")
 
     with col_w2:
-        st.markdown("###### 🚫 Auditoría de Números de Descargo Inválidos (`00000`) o Finalizadas sin Coordenadas GPS")
+        st.markdown("###### 🔍 2. Anomalías de Rutina (`Inicio/Fin Turno` o `Alimentación` Canceladas / Suspendidas)")
+        rutinas_anomalas = df_contexto_turno[
+            (df_contexto_turno['Subtipo_Actividad'].str.upper().isin(['INICIO TURNO', 'FIN TURNO', 'ALIMENTACIÓN', 'ALIMENTACION'])) &
+            (df_contexto_turno['Estado_Actividad'].str.lower().isin(['cancelada', 'suspendida', 'no realizado']))
+        ]
+        if not rutinas_anomalas.empty:
+            st.info(f"Se registran **{len(rutinas_anomalas)}** actividades de rutina marcadas como Canceladas, Suspendidas o No Realizadas:")
+            st.dataframe(
+                rutinas_anomalas[['Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Subtipo_Actividad', 'Estado_Actividad', 'Motivo_Cancelacion', 'Comentarios_Cancelacion', 'Comentarios_Suspension']],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.success("✅ No hay rutinas de turno con cancelaciones o suspensiones anómalas.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    # FILA 2 DE AUDITORÍA: REZAGOS OPERATIVOS (DAÑOS/OT PENDIENTES O SUSPENDIDAS) VS DESCARGOS INVÁLIDOS
+    col_w3, col_w4 = st.columns([1.3, 1])
+    with col_w3:
+        st.markdown("###### 🚨 3. Seguimiento Prioritario: Daños / OT Operativas en Estado `Pendiente` o `Suspendida`")
+        operativas_rezago = df_contexto_turno[
+            (df_contexto_turno['Categoria_Labor'] == 'Operativa (Daños / OT)') &
+            (df_contexto_turno['Estado_Actividad'].str.lower().isin(['pendiente', 'suspendida']))
+        ].copy()
+        if not operativas_rezago.empty:
+            f_est_rez = st.radio(
+                "Filtrar rezagos operativos por estado:",
+                options=["Todos (Pendientes + Suspendidas)", "Solo Pendientes", "Solo Suspendidas"],
+                horizontal=True,
+                key="rad_rezago"
+            )
+            if f_est_rez == "Solo Pendientes":
+                operativas_rezago = operativas_rezago[operativas_rezago['Estado_Actividad'].str.lower() == 'pendiente']
+            elif f_est_rez == "Solo Suspendidas":
+                operativas_rezago = operativas_rezago[operativas_rezago['Estado_Actividad'].str.lower() == 'suspendida']
+
+            cols_rez = [
+                'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Orden_Trabajo',
+                'ID_Actividad', 'Subtipo_Actividad', 'Estado_Actividad',
+                'Nodos_Detectados', 'Causas_Raiz_Texto', 'Comentarios_Suspension', 'Observaciones', 'Descripcion_Orden'
+            ]
+            st.dataframe(
+                operativas_rezago[[c for c in cols_rez if c in operativas_rezago.columns]],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.success("✅ No hay incidentes ni órdenes operativas pendientes o suspendidas en la selección actual.")
+
+    with col_w4:
+        st.markdown("###### 🚫 4. Auditoría de Descargos Inválidos (`00000`) o Finalizadas sin GPS")
         descargo_invalido = df_f[
             (df_f['Numero_Descargo'].str.contains('^0+$', regex=True, na=False)) |
             ((df_f['Estado_Actividad'].str.lower() == 'finalizada') & (df_f['Categoria_Labor'] == 'Operativa (Daños / OT)') & (df_f['Lat'].isna()))
@@ -1492,7 +1535,6 @@ with tab_nodos:
         "(Vegetación, Deterioro de Material, Lluvias, Vientos, Descargas Atmosféricas, Animales, Terceros y Variación BT)."
     )
 
-    # Expandir Nodos + Causas (Si un aviso en el nodo S00058 tuvo Lluvias + Vegetación, suma ambas causas)
     rows_nodos_flat = []
     rows_nodos_causas = []
 
@@ -1530,7 +1572,6 @@ with tab_nodos:
         df_nodos_exp = pd.DataFrame(rows_nodos_flat)
         df_nc_exp = pd.DataFrame(rows_nodos_causas)
 
-        # FILTROS INTERACTIVOS DE ZOOM (FAMILIA, CAUSA RAÍZ Y CÓDIGO DE NODO)
         c_nd1, c_nd2, c_nd3 = st.columns([1, 1.2, 1])
         with c_nd1:
             tipos_eq = ["Todos"] + sorted(df_nodos_exp['Tipo_Equipo'].unique().tolist())
@@ -1562,7 +1603,6 @@ with tab_nodos:
             df_nodos_filt = df_nodos_filt[df_nodos_filt['Nodo_Equipo'].str.contains(q_nd, na=False)]
             df_nc_filt = df_nc_filt[df_nc_filt['Nodo_Equipo'].str.contains(q_nd, na=False)]
 
-        # Agrupar resumen por Nodo único
         resumen_nodos = df_nodos_filt.groupby(['Nodo_Equipo', 'Tipo_Equipo', 'Sector', 'Zona_Oficial']).agg(
             Veces_Intervenido=('ID_Actividad', 'count'),
             Causas_Acumuladas=('Lista_Causas', lambda s: " | ".join(sorted({c for lst in s for c in lst}))),
@@ -1573,7 +1613,6 @@ with tab_nodos:
 
         resumen_nodos['Accion_Recomendada'] = resumen_nodos['Causas_Acumuladas'].apply(recommend_action_from_causes)
 
-        # FILA 1 DE GRÁFICOS: DONUT POR FAMILIA (%) + BARRAS VERTICALES DE NODOS COLOREADAS POR CAUSA RAÍZ
         col_ng1, col_ng2 = st.columns([1, 1.45])
         with col_ng1:
             st.markdown("###### 📊 Porcentaje por Familia (`RB/RC`, `PF/6`, `S`, `CD`)")
@@ -1617,7 +1656,6 @@ with tab_nodos:
             fig_nodos.update_layout(xaxis_tickangle=-45, height=390, margin=dict(t=15, b=40, l=10, r=10), legend=dict(orientation="h", y=1.15))
             st.plotly_chart(fig_nodos, use_container_width=True)
 
-        # FILA 2 DE GRÁFICOS: RADAR EJECUTIVO DE CAUSAS + MATRIZ DE CAUSAS POR ZONA OFICIAL
         st.markdown("---")
         col_rad1, col_rad2 = st.columns([1, 1.35])
         with col_rad1:
