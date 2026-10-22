@@ -103,16 +103,16 @@ st.markdown("""
         font-size: 0.9rem;
     }
     .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
+        gap: 5px;
     }
     .stTabs [data-baseweb="tab"] {
         background-color: #ffffff;
         border-radius: 6px;
-        padding: 8px 14px;
+        padding: 8px 12px;
         border: 1px solid #e2e8f0;
         font-weight: 600;
         color: #334155;
-        font-size: 0.84rem;
+        font-size: 0.82rem;
     }
     .stTabs [aria-selected="true"] {
         background-color: #0f172a !important;
@@ -182,10 +182,10 @@ MAESTRO_ZONAS = {
     "BOLM-350": ("NORTE", "MARIQUITA")
 }
 
-ROTATIVAS_3T_CENTRO = {"BOLG-332", "BOLV-330", "BOLV-333", "BOLV-336", "BOLV-394", "BOLV-397", "BOLV-399"}  #[cite: 1]
-ROTATIVAS_2T_NORTE = {"BOLV-363", "BOLV-365"}  # 06:00-14:00 y 14:00-22:00[cite: 1]
-ROTATIVAS_3T_NORTE = {"BOLV-366", "BOLV-368", "BOLV-396"}  # 06:00-14:00, 14:00-22:00, 22:00-06:00[cite: 1]
-BOLE_ESPECIALES = {"BOLE-990", "BOLE-999"}  # L-V 07:30-16:30[cite: 1]
+ROTATIVAS_3T_CENTRO = {"BOLG-332", "BOLV-330", "BOLV-333", "BOLV-336", "BOLV-394", "BOLV-397", "BOLV-399"}
+ROTATIVAS_2T_NORTE = {"BOLV-363", "BOLV-365"}
+ROTATIVAS_3T_NORTE = {"BOLV-366", "BOLV-368", "BOLV-396"}
+BOLE_ESPECIALES = {"BOLE-990", "BOLE-999"}
 
 MESES_ES = {
     1: "01 - Enero", 2: "02 - Febrero", 3: "03 - Marzo", 4: "04 - Abril",
@@ -211,10 +211,9 @@ COLORES_CAUSAS = {
 }
 
 # -----------------------------------------------------------------------------
-# 4. FUNCIONES DE LECTURA Y PROCESAMIENTO (APARTADO DE LECTURA INTACTO)
+# 4. FUNCIONES DE LECTURA Y PROCESAMIENTO
 # -----------------------------------------------------------------------------
 def convert_time_to_minutes(time_val):
-    """Convierte formato HH:MM o numérico a minutos."""
     if pd.isna(time_val):
         return 0.0
     val_str = str(time_val).strip()
@@ -231,7 +230,6 @@ def convert_time_to_minutes(time_val):
 
 
 def hour_str_to_min_of_day(val):
-    """Convierte una hora 'HH:MM' en el minuto del día (0 a 1439)."""
     if pd.isna(val):
         return np.nan
     s = str(val).strip()
@@ -242,7 +240,6 @@ def hour_str_to_min_of_day(val):
 
 
 def parse_google_drive_url(url: str) -> str:
-    """Convierte enlaces compartidos de Google Drive en descarga directa."""
     if not url:
         return ""
     sheets_match = re.search(r'/spreadsheets/d/([a-zA-Z0-9_-]+)', url)
@@ -259,7 +256,6 @@ def parse_google_drive_url(url: str) -> str:
 
 
 def normalize_recurso_key(recurso_str: str) -> str:
-    """Extrae el código base de la brigada (ej. 'BOLV-399 (Apoyo)' -> 'BOLV-399', 'BOLM 371' -> 'BOLM-371')."""
     if pd.isna(recurso_str):
         return "SIN RECURSO"
     s = str(recurso_str).upper().strip()
@@ -271,12 +267,11 @@ def normalize_recurso_key(recurso_str: str) -> str:
 
 
 def get_shift_profile(recurso_base: str):
-    """Retorna la regla de horario oficial de cada brigada."""
     if recurso_base in BOLE_ESPECIALES:
         return ("L-V 07:30-16:30 (Enlace CELSIA)", "FIJO_BOLE", 7*60+30, 16*60+30, 8.0)
-    if recurso_base == "BOLV-398":  #[cite: 1]
+    if recurso_base == "BOLV-398":
         return ("Fijo 08:00-16:00 (7h netas)", "FIJO", 8*60, 16*60, 7.0)
-    if recurso_base in {"BOLM-348", "BOLM-353"}:  #[cite: 1]
+    if recurso_base in {"BOLM-348", "BOLM-353"}:
         return ("Fijo 09:00-17:00 (7h netas)", "FIJO", 9*60, 17*60, 7.0)
     if recurso_base in ROTATIVAS_3T_CENTRO:
         return ("Rotativo 3T Urbano (6-14 / 14-22 / 22-6)", "ROTATIVO_3T", None, None, 8.0)
@@ -288,7 +283,6 @@ def get_shift_profile(recurso_base: str):
 
 
 def infer_daily_shift_window(tipo_turno, min_ini_fijo, min_fin_fijo, mins_inicio_dia):
-    """Determina la ventana exacta (min_inicio, min_fin) del turno de ese día."""
     if tipo_turno in {"FIJO", "FIJO_BOLE"}:
         return min_ini_fijo, min_fin_fijo, f"{min_ini_fijo//60:02d}:{min_ini_fijo%60:02d} a {min_fin_fijo//60:02d}:{min_fin_fijo%60:02d}"
     
@@ -315,9 +309,8 @@ def infer_daily_shift_window(tipo_turno, min_ini_fijo, min_fin_fijo, mins_inicio
 
 
 def classify_urban_vs_rural(row):
-    """Clasifica si el aviso atendido es en Casco Urbano del Municipio o en Vereda/Rural."""
     zona_of = str(row.get('Zona_Oficial', '')).upper()
-    if zona_of == "IBAGUE URBANA":  #[cite: 1]
+    if zona_of == "IBAGUE URBANA":
         return "🏙️ Ibagué Casco Urbano"
     
     txt = f"{row.get('Dirección', '')} {row.get('Descripcion_Orden', '')} {row.get('Observaciones', '')}".upper()
@@ -334,7 +327,7 @@ def classify_urban_vs_rural(row):
         return "🏘️ Casco Urbano Municipio"
     if is_rural:
         return "🌲 Zona Veredal / Rural"
-    if zona_of == "IBAGUE RURAL":  #[cite: 1]
+    if zona_of == "IBAGUE RURAL":
         return "🌲 Zona Veredal / Rural"
     return "📍 General Municipio"
 
@@ -392,10 +385,6 @@ def classify_observaciones(obs_text):
 
 
 def detect_root_causes_multicausal(row):
-    """
-    Detecta y suma TODAS las causas raíz presentes en el aviso (Vegetación, Lluvias,
-    Vientos, Descargas Atmosféricas, Animales, Terceros, Deterioro de Material y Variación/BT).
-    """
     textos = [
         str(row.get('Observaciones', '')),
         str(row.get('Comentarios_Suspension', '')),
@@ -430,8 +419,30 @@ def detect_root_causes_multicausal(row):
     return causas
 
 
+def classify_labor_tecnica(row):
+    """Clasifica el tipo de labor técnica ejecutada en sitio basada en los textos."""
+    textos = [
+        str(row.get('Observaciones', '')),
+        str(row.get('Comentarios_Suspension', '')),
+        str(row.get('Comentarios_No_Realizado', '')),
+        str(row.get('Descripcion_Orden', ''))
+    ]
+    t = " ".join([x for x in textos if x and x != 'nan']).upper()
+    
+    if any(k in t for k in ["RETENSIONA", "TEMPLADO", "EMPALME", "LÍNEA REVENTADA", "LINEA REVENTADA", "PUENTE ROTO", "PUENTE REVENTADO", "CUERDA CAIDA", "CUERDAS CAIDAS", "ACOMETIDA REVENTADA"]):
+        return "🧗 Retensionado / Empalme / Línea Reventada"
+    if any(k in t for k in ["PODA", "RETIRO DE VEGETACIÓN", "RETIRO DE VEGETACION", "DESRAME", "ARBOL", "ÁRBOL", "GUADUA", "PALMA", "RAMA"]):
+        return "🌿 Poda / Despeje Vegetación"
+    if any(k in t for k in ["AISLADOR", "PIN DE PORCELANA", "CORTACIRCUITO", "DPS", "PARARRAYO", "BORNERA", "CRUCETA", "PUNTO CALIENTE"]):
+        return "🔩 Cambio / Adecuación Componentes"
+    if any(k in t for k in ["FUSIBLE", "CAÑUELA", "VELA", "SECCIONAMIENTO", "RECONECTADOR", "CIERRE"]):
+        return "⚡ Maniobra Rápida en Fusible / Cañuela"
+    if any(k in t for k in ["INSPECCIÓN VISUAL", "INSPECCION VISUAL", "CONTESTA", "SERVICIO NORMAL", "SIN NOVEDAD"]):
+        return "🔎 Inspección / Servicio Normal"
+    return "🔧 Intervención General en Red"
+
+
 def recommend_action_from_causes(causes_str: str) -> str:
-    """Sugiere la acción técnica especializada según las causas detectadas en el nodo."""
     recs = []
     if "Vegetación" in causes_str:
         recs.append("🌲 Programar Poda / Despeje Red / Apoyo L.V.")
@@ -476,10 +487,6 @@ def classify_cancelacion(row):
 
 
 def extract_nodes_preserve_exact(row):
-    """
-    Extrae nodos/equipos que empiezan por 6, PF, RB, RC, CD o S tal cual fueron escritos,
-    incluyendo también la columna 'Numero_Descargo'.
-    """
     textos = [
         str(row.get('Observaciones', '')),
         str(row.get('Comentarios_Suspension', '')),
@@ -510,10 +517,6 @@ def classify_node_type(node_code: str) -> str:
 
 
 def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
-    """
-    Estandariza columnas, asigna zonas, calcula tiempos en cola EGAM, Gantt,
-    corte exacto post-turno y el Radar Multicausal de Fallas.
-    """
     if df.empty:
         return df
     
@@ -662,6 +665,7 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
     df['Nodos_Detectados'] = df['Lista_Nodos'].apply(lambda lst: ", ".join(lst) if lst else "")
     df['Lista_Causas_Raiz'] = df.apply(detect_root_causes_multicausal, axis=1)
     df['Causas_Raiz_Texto'] = df['Lista_Causas_Raiz'].apply(lambda lst: " | ".join(lst))
+    df['Labor_Tecnica'] = df.apply(classify_labor_tecnica, axis=1)
 
     df['Minutos_Reaccion'] = df.apply(calc_reaction_minutes, axis=1)
 
@@ -746,7 +750,6 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
 
 @st.cache_data(ttl=120, show_spinner=False)
 def load_data_from_url(drive_url: str):
-    """Descarga y concatena las hojas del Excel desde el URL de Drive."""
     try:
         direct_url = parse_google_drive_url(drive_url)
         response = requests.get(direct_url, timeout=30)
@@ -1134,12 +1137,13 @@ if not rec_stats.empty:
 
 
 # -----------------------------------------------------------------------------
-# 10. PESTAÑAS DE NAVEGACIÓN PROFESIONAL
+# 10. PESTAÑAS DE NAVEGACIÓN PROFESIONAL (9 PESTAÑAS DEDICADAS)
 # -----------------------------------------------------------------------------
-tab_brigadas, tab_post, tab_zonas, tab_tiempos, tab_nodos, tab_obs, tab_mapa, tab_datos = st.tabs([
+tab_brigadas, tab_post, tab_zonas, tab_labores, tab_tiempos, tab_nodos, tab_obs, tab_mapa, tab_datos = st.tabs([
     "👷 Control Brigadas, Standby y Extras",
     "🌙 Auditoría Post-Turno y Casco Urbano",
     "🗺️ Desempeño Zonas Oficiales",
+    "🛠️ Labores Técnicas y Tiempos en Sitio",
     "⏱️ Cola EGAM, Gantt y Disciplina WFM",
     "⚡ Nodos Recurrentes y Radar de Causas",
     "🔍 Observaciones y EGAM/RPA",
@@ -1282,7 +1286,7 @@ with tab_post:
             st.info("No se registran horas post-turno en la selección actual.")
 
     with col_p2:
-        df_muni_urb = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()  #[cite: 1]
+        df_muni_urb = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()
         if not df_muni_urb.empty:
             urb_cnt = df_muni_urb.groupby(['Zona_Oficial', 'Entorno_Ubicacion']).size().reset_index(name='Cantidad')
             fig_urb = px.bar(
@@ -1315,7 +1319,7 @@ with tab_post:
     with c_u2:
         solo_post_muni = st.checkbox("Ver únicamente avisos que superaron el horario de turno (Post-Turno / Extras)", value=False)
 
-    df_muni_view = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()  #[cite: 1]
+    df_muni_view = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()
     if f_entorno == "Solo 🏘️ Casco Urbano Municipio":
         df_muni_view = df_muni_view[df_muni_view['Entorno_Ubicacion'] == "🏘️ Casco Urbano Municipio"]
     elif f_entorno == "Solo 🌲 Zona Veredal / Rural":
@@ -1379,7 +1383,78 @@ with tab_zonas:
 
     st.dataframe(zona_summary, use_container_width=True, hide_index=True)
 
-# ================= TAB 4: COLA EGAM, GANTT HORARIO Y DISCIPLINA WFM (CORREGIDO Y SEPARADO) =================
+# ================= TAB 4: LABORES TÉCNICAS Y VALIDACIÓN DE 45 MINUTOS =================
+with tab_labores:
+    st.markdown("##### 🛠️ Validador de Tiempos en Sitio y Tipos de Labor Técnica Ejecutada")
+    st.caption("Estándar operativo: El tiempo de duración en sitio (faena) no debe superar los **45 minutos** en revisiones y maniobras estándar.")
+
+    df_lab = df_f[df_f['Categoria_Labor'] == 'Operativa (Daños / OT)'].copy()
+    if not df_lab.empty:
+        # Evaluar cumplimiento del estándar de 45 minutos
+        df_lab['Cumple_Estandar_45m'] = df_lab['Minutos_Duracion'].apply(lambda x: "🟢 Óptimo (< 45 min)" if x <= 45 else "🔴 Excede Estándar (> 45 min)")
+
+        col_l1, col_l2 = st.columns(2)
+        with col_l1:
+            st.markdown("###### ⏱️ Tiempo Promedio en Sitio por Tipo de Labor Técnica")
+            labor_summary = df_lab.groupby('Labor_Tecnica').agg(
+                Cantidad=('ID_Actividad', 'count'),
+                Prom_Min_Sitio=('Minutos_Duracion', 'mean'),
+                Max_Min_Sitio=('Minutos_Duracion', 'max'),
+                Exceden_45m=('Minutos_Duracion', lambda x: (x > 45).sum())
+            ).reset_index().sort_values(by='Prom_Min_Sitio', ascending=False)
+
+            fig_lab = px.bar(
+                labor_summary,
+                x='Prom_Min_Sitio',
+                y='Labor_Tecnica',
+                orientation='h',
+                text='Prom_Min_Sitio',
+                color='Prom_Min_Sitio',
+                color_continuous_scale='Sunset',
+                labels={'Prom_Min_Sitio': 'Minutos Promedio en Sitio', 'Labor_Tecnica': 'Tipo de Labor Técnica'}
+            )
+            fig_lab.update_traces(texttemplate='%{text:.0f} min', textposition='outside')
+            fig_lab.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=10, b=10, l=10, r=40))
+            st.plotly_chart(fig_lab, use_container_width=True)
+
+        with col_l2:
+            st.markdown("###### 📊 Distribución de Órdenes según Estándar de 45 Minutos")
+            est_counts = df_lab['Cumple_Estandar_45m'].value_counts().reset_index()
+            est_counts.columns = ['Estado Estándar', 'Total']
+            fig_est_45 = px.pie(
+                est_counts,
+                values='Total',
+                names='Estado Estándar',
+                hole=0.45,
+                color='Estado Estándar',
+                color_discrete_map={
+                    "🟢 Óptimo (< 45 min)": "#10b981",
+                    "🔴 Excede Estándar (> 45 min)": "#ef4444"
+                }
+            )
+            fig_est_45.update_layout(height=360, margin=dict(t=10, b=10, l=10, r=10), legend=dict(orientation="h", y=-0.1))
+            st.plotly_chart(fig_est_45, use_container_width=True)
+
+        st.markdown("###### 📋 Detalle de Órdenes Operativas y Verificación del Estándar en Sitio")
+        st.dataframe(
+            df_lab[[
+                'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Orden_Trabajo',
+                'ID_Actividad', 'Labor_Tecnica', 'Minutos_Duracion', 'Cumple_Estandar_45m',
+                'Nodos_Detectados', 'Causas_Raiz_Texto', 'Observaciones'
+            ]],
+            column_config={
+                "Minutos_Duracion": st.column_config.NumberColumn("Duración Sitio", format="%.0f min"),
+                "Cumple_Estandar_45m": "Evaluación 45 min",
+                "Causas_Raiz_Texto": "Causas Detectadas",
+                "Observaciones": st.column_config.TextColumn("Observaciones del Recurso", width="large")
+            },
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("No hay actividades operativas de daños u OT en la selección actual para evaluar las labores técnicas.")
+
+# ================= TAB 5: COLA EGAM, GANTT HORARIO Y DISCIPLINA WFM =================
 with tab_tiempos:
     st.markdown("##### ⏳ Mejora A: Desglose de Demora — Cola de Despacho EGAM (Generación ➔ Asignación) vs. Reacción Brigada (Asignación ➔ Inicio)")
     col_t1, col_t2 = st.columns(2)
@@ -1444,7 +1519,6 @@ with tab_tiempos:
     st.markdown("---")
     st.markdown("##### 🛡️ Mejora C: Auditoría de Disciplina en el Aplicativo WFM y Rezagos Operativos")
     
-    # FILA 1 DE AUDITORÍA: RUTINAS ESTRICTAMENTE EN PENDIENTE VS ANOMALÍAS DE RUTINA (CANCELADAS/SUSPENDIDAS)
     col_w1, col_w2 = st.columns(2)
     with col_w1:
         st.markdown("###### ⚠️ 1. Rutinas Abiertas sin Cerrar (Únicamente en Estado `Pendiente`)")
@@ -1479,7 +1553,6 @@ with tab_tiempos:
             st.success("✅ No hay rutinas de turno con cancelaciones o suspensiones anómalas.")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    # FILA 2 DE AUDITORÍA: REZAGOS OPERATIVOS (DAÑOS/OT PENDIENTES O SUSPENDIDAS) VS DESCARGOS INVÁLIDOS
     col_w3, col_w4 = st.columns([1.3, 1])
     with col_w3:
         st.markdown("###### 🚨 3. Seguimiento Prioritario: Daños / OT Operativas en Estado `Pendiente` o `Suspendida`")
@@ -1527,13 +1600,10 @@ with tab_tiempos:
         else:
             st.success("✅ No se detectaron descargos en '00000' ni órdenes operativas finalizadas sin GPS.")
 
-# ================= TAB 5: NODOS RECURRENTES Y RADAR MULTICAUSAL DE CAUSAS RAÍZ =================
+# ================= TAB 6: NODOS RECURRENTES Y RADAR DE CAUSAS =================
 with tab_nodos:
     st.markdown("##### ⚡ Detección de Nodos / Equipos Recurrentes y Radar Multicausal de Fallas")
-    st.caption(
-        "Extrae los nodos (`6...`, `PF...`, `RB...`, `RC...`, `CD...`, `S...`) tal cual fueron reportados y suma todas las causas raíz combinadas en cada aviso "
-        "(Vegetación, Deterioro de Material, Lluvias, Vientos, Descargas Atmosféricas, Animales, Terceros y Variación BT)."
-    )
+    st.caption("Extrae los nodos y suma todas las causas raíz combinadas en cada aviso.")
 
     rows_nodos_flat = []
     rows_nodos_causas = []
@@ -1582,7 +1652,7 @@ with tab_nodos:
                 "2. Hacer Zoom por Causa(s) Raíz:",
                 options=causas_disp_nd,
                 default=[],
-                placeholder="Todas las causas (o elige ej. Vegetación, Animales)..."
+                placeholder="Todas las causas..."
             )
         with c_nd3:
             buscar_nodo = st.text_input("3. Buscar Código Exacto de Nodo:", placeholder="Ej: RB1950, CD23329, S00058...")
@@ -1651,7 +1721,7 @@ with tab_nodos:
                 category_orders={'Nodo_Equipo': top_20_names},
                 hover_data=['Zona_Oficial'],
                 color_discrete_map=COLORES_CAUSAS,
-                labels={'Nodo_Equipo': 'Código Nodo / Equipo', 'Incidencias': 'Cantidad (Suma de Causas)'}
+                labels={'Nodo_Equipo': 'Código Nodo / Equipo', 'Incidencias': 'Cantidad'}
             )
             fig_nodos.update_layout(xaxis_tickangle=-45, height=390, margin=dict(t=15, b=40, l=10, r=10), legend=dict(orientation="h", y=1.15))
             st.plotly_chart(fig_nodos, use_container_width=True)
@@ -1675,7 +1745,7 @@ with tab_nodos:
                 st.plotly_chart(fig_radar, use_container_width=True)
 
         with col_rad2:
-            st.markdown("###### 🗺️ Causas de Falla en Nodos por Zona Oficial (¿Qué golpea a cada Municipio?)")
+            st.markdown("###### 🗺️ Causas de Falla en Nodos por Zona Oficial")
             zona_causa_cnt = df_nc_filt.groupby(['Zona_Oficial', 'Causa_Raiz']).size().reset_index(name='Eventos')
             fig_zc = px.bar(
                 zona_causa_cnt,
@@ -1700,7 +1770,7 @@ with tab_nodos:
             column_config={
                 "Nodo_Equipo": "Nodo / Equipo",
                 "Veces_Intervenido": "Veces",
-                "Causas_Acumuladas": st.column_config.TextColumn("Causas Detectadas (Suma Multicausal)", width="medium"),
+                "Causas_Acumuladas": st.column_config.TextColumn("Causas Detectadas", width="medium"),
                 "Accion_Recomendada": st.column_config.TextColumn("Acción Especializada Sugerida", width="large")
             },
             use_container_width=True,
@@ -1716,7 +1786,7 @@ with tab_nodos:
     else:
         st.info("No se detectaron códigos de nodos en la selección actual.")
 
-# ================= TAB 6: OBSERVACIONES Y AUDITORÍA DE CANCELADOS EGAM/RPA =================
+# ================= TAB 7: OBSERVACIONES Y AUDITORÍA DE CANCELADOS EGAM/RPA =================
 with tab_obs:
     st.markdown("##### 🚫 Auditoría de Actividades Canceladas: Gestión EGAM vs. Agrupación RPA vs. Operativo")
     df_canc_only = df_f[df_f['Estado_Actividad'].str.lower() == 'cancelada'].copy()
@@ -1785,7 +1855,7 @@ with tab_obs:
     
     st.dataframe(df_obs_view[cols_obs_table], use_container_width=True, hide_index=True)
 
-# ================= TAB 7: MAPA GEOGRÁFICO Y TRAZABILIDAD DE RUTA =================
+# ================= TAB 8: MAPA GEOGRÁFICO Y TRAZABILIDAD DE RUTA =================
 with tab_mapa:
     st.markdown("##### 📍 Georreferenciación, Buscador de OT y Trazabilidad de Ruta por Brigada")
     df_map = df_f.dropna(subset=['Lat', 'Lon']).copy()
@@ -1850,7 +1920,7 @@ with tab_mapa:
             if ver_trazabilidad:
                 st.dataframe(df_map[['Orden_Secuencia', 'Recurso', 'Fecha_Str', 'Orden_Trabajo', 'ID_Actividad', 'Clasificacion_Jornada', 'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Causas_Raiz_Texto', 'Observaciones']], use_container_width=True, hide_index=True)
 
-# ================= TAB 8: BASE CONSOLIDADA Y AUDITORÍA =================
+# ================= TAB 9: BASE CONSOLIDADA Y AUDITORÍA =================
 with tab_datos:
     st.markdown("##### 📋 Registros Consolidados con Clasificación de Turno, Horas Extras, Cola EGAM, Nodos, Causas y Observaciones")
     cols_auditoria = [c for c in [
