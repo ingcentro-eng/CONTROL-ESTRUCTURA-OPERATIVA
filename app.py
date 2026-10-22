@@ -198,6 +198,18 @@ ACTIVIDADES_RUTINA = [
     "FORMACIONES", "TIEMPO NO PRODUCTIVO"
 ]
 
+COLORES_CAUSAS = {
+    "🌿 Vegetación / Árboles": "#10b981",
+    "🔧 Deterioro / Falla de Material": "#f59e0b",
+    "🌧️ Lluvias / Mal Tiempo": "#3b82f6",
+    "💨 Fuertes Vientos": "#06b6d4",
+    "⚡ Descargas Atmosféricas": "#8b5cf6",
+    "🐾 Animales / Fauna": "#ec4899",
+    "🚗 Terceros / Vehículos": "#ef4444",
+    "🔌 Variación Voltaje / Acometida BT": "#6366f1",
+    "🔍 Operación / Sin Causa Explícita": "#94a3b8"
+}
+
 # -----------------------------------------------------------------------------
 # 4. FUNCIONES DE LECTURA Y PROCESAMIENTO (APARTADO DE LECTURA INTACTO)
 # -----------------------------------------------------------------------------
@@ -379,6 +391,75 @@ def classify_observaciones(obs_text):
     return " | ".join(tags)
 
 
+def detect_root_causes_multicausal(row):
+    """
+    Detecta y suma TODAS las causas raíz presentes en el aviso (Vegetación, Lluvias,
+    Vientos, Descargas Atmosféricas, Animales, Terceros, Deterioro de Material y Variación/BT).
+    """
+    textos = [
+        str(row.get('Observaciones', '')),
+        str(row.get('Comentarios_Suspension', '')),
+        str(row.get('Comentarios_No_Realizado', '')),
+        str(row.get('Comentarios_Cancelacion', '')),
+        str(row.get('Descripcion_Orden', ''))
+    ]
+    t = " ".join([x for x in textos if x and x != 'nan']).upper()
+    if not t.strip():
+        return ["🔍 Operación / Sin Causa Explícita"]
+    
+    causas = []
+    # 1. Vegetación / Árboles
+    if any(k in t for k in ["VEGETACION", "VEGETACIÓN", "ARBOL", "ÁRBOL", "RAMA", "GUADUA", "PALMA", "PODA", "MALEZA", "CHAMIZA", "BAMBU", "BAMBÚ"]):
+        causas.append("🌿 Vegetación / Árboles")
+    # 2. Lluvias / Mal Tiempo
+    if any(k in t for k in ["LLUVIA", "TORMENTA", "AGUACERO", "INVIERNO", "MAL TIEMPO", "BORRASCA", "VENDAVAL", "INUNDACION"]):
+        causas.append("🌧️ Lluvias / Mal Tiempo")
+    # 3. Fuertes Vientos
+    if any(k in t for k in ["VIENTO", "VIENTOS", "VENTARRON", "VENTARRÓN", "BRISA FUERTE"]):
+        causas.append("💨 Fuertes Vientos")
+    # 4. Descargas Atmosféricas
+    if any(k in t for k in ["DESCARGA", "RAYO", "ATMOSFERICA", "ATMOSFÉRICA", "TRUENO", "DPS", "PARARRAYO"]):
+        causas.append("⚡ Descargas Atmosféricas")
+    # 5. Animales / Fauna
+    if any(k in t for k in ["ANIMAL", "AVE ", "AVES", "PAJARO", "PÁJARO", "ARDILLA", "IGUANA", "SERPIENTE", "CULEBRA", "GATO", "ZARIGÜEYA", "CHUCHA", "MONO", "GARZA", "GALLINAZO", "NIDO"]):
+        causas.append("🐾 Animales / Fauna")
+    # 6. Terceros / Vehículos
+    if any(k in t for k in ["VEHICULO", "VEHÍCULO", "CAMION", "CAMIÓN", "CARRO", "TERCERO", "VANDALISMO", "HURTO", "ROBO", "CHOQUE", "ESTRELL", "GRUA", "GRÚA", "VOLQUETA", "RETRO", "COMETA"]):
+        causas.append("🚗 Terceros / Vehículos")
+    # 7. Deterioro / Falla de Material o Equipo MT
+    if any(k in t for k in ["PUNTO CALIENTE", "AISLADOR", "PIN DE PORCELANA", "SULFATA", "DETERIOR", "MAL ESTADO", "FATIGA", "QUEMAD", "ROTO", "REVENTAD", "CUERDA CAIDA", "CUERDAS CAIDAS", "VELA CAIDA", "VELAS CAIDAS", "CAÑUELA", "CORTACIRCUITO"]):
+        causas.append("🔧 Deterioro / Falla de Material")
+    # 8. Variación de Voltaje / Acometida / BT
+    if any(k in t for k in ["VOLTAJE", "SUBE Y BAJA", "BORNERA", "ACOMETIDA", "MEDIDOR"]):
+        causas.append("🔌 Variación Voltaje / Acometida BT")
+
+    if not causas:
+        return ["🔍 Operación / Sin Causa Explícita"]
+    return causas
+
+
+def recommend_action_from_causes(causes_str: str) -> str:
+    """Sugiere la acción técnica especializada según las causas detectadas en el nodo."""
+    recs = []
+    if "Vegetación" in causes_str:
+        recs.append("🌲 Programar Poda / Despeje Red / Apoyo L.V.")
+    if "Deterioro" in causes_str:
+        recs.append("🔧 Inspección Termográfica / Cambio Aislamiento o Herrajes")
+    if "Animales" in causes_str:
+        recs.append("🐾 Instalar Dispositivos Antifauna / Cubiertas")
+    if "Descargas" in causes_str:
+        recs.append("⚡ Revisar DPS / Puesta a Tierra (SPT)")
+    if "Terceros" in causes_str:
+        recs.append("🚗 Validar Altura / Señalización / Adecuación Red")
+    if "Lluvias" in causes_str or "Vientos" in causes_str:
+        recs.append("🌧️ Revisión de Tensionado y Amarres de Línea")
+    if "Voltaje" in causes_str:
+        recs.append("🔌 Balanceo de Cargas / Revisión Conexiones BT")
+    if not recs:
+        return "🔎 Inspección Técnica General de Nodo"
+    return " + ".join(recs[:2])
+
+
 def classify_cancelacion(row):
     estado = str(row.get('Estado_Actividad', '')).lower().strip()
     if estado != 'cancelada':
@@ -438,7 +519,8 @@ def classify_node_type(node_code: str) -> str:
 
 def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
     """
-    Estandariza columnas, asigna zonas, calcula tiempos en cola EGAM, Gantt y corte exacto post-turno.
+    Estandariza columnas, asigna zonas, calcula tiempos en cola EGAM, Gantt,
+    corte exacto post-turno y el Radar Multicausal de Fallas.
     """
     if df.empty:
         return df
@@ -535,11 +617,9 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
     df['Ini_Min_Dia'] = df['Inicio'].apply(hour_str_to_min_of_day) if 'Inicio' in df.columns else np.nan
     df['Fin_Min_Dia'] = df['Finalización'].apply(hour_str_to_min_of_day) if 'Finalización' in df.columns else np.nan
 
-    # Construcción de Datetimes exactos para el Diagrama de Gantt (Timeline)
     if 'Inicio' in df.columns and 'Finalización' in df.columns:
         dt_ini_s = pd.to_datetime(df['Fecha_Str'] + ' ' + df['Inicio'].fillna('').astype(str).str.strip(), errors='coerce')
         dt_fin_s = pd.to_datetime(df['Fecha_Str'] + ' ' + df['Finalización'].fillna('').astype(str).str.strip(), errors='coerce')
-        # Si Finalización es menor o igual a Inicio, ajustar (cruza medianoche o dura 1 min visual)
         dt_fin_adj = np.where(
             (dt_fin_s.notna()) & (dt_ini_s.notna()) & (dt_fin_s < dt_ini_s),
             dt_fin_s + pd.Timedelta(days=1),
@@ -555,7 +635,6 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
         df['DT_Inicio'] = pd.NaT
         df['DT_Fin'] = pd.NaT
 
-    # Mejora A: Tiempo en Cola EGAM / Despacho (Fecha_Generacion -> Hora_Asignacion)
     if 'Fecha_Generacion' in df.columns and 'Hora_Asignacion' in df.columns:
         dt_gen = pd.to_datetime(df['Fecha_Generacion'], dayfirst=True, errors='coerce')
         dt_asig = pd.to_datetime(df['Hora_Asignacion'], errors='coerce')
@@ -587,8 +666,12 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
     df['Origen_Cancelacion'] = df.apply(classify_cancelacion, axis=1)
     df['Entorno_Ubicacion'] = df.apply(classify_urban_vs_rural, axis=1)
 
+    # Nodos y Causas Raíz Multicausales
     df['Lista_Nodos'] = df.apply(extract_nodes_preserve_exact, axis=1)
     df['Nodos_Detectados'] = df['Lista_Nodos'].apply(lambda lst: ", ".join(lst) if lst else "")
+    df['Lista_Causas_Raiz'] = df.apply(detect_root_causes_multicausal, axis=1)
+    df['Causas_Raiz_Texto'] = df['Lista_Causas_Raiz'].apply(lambda lst: " | ".join(lst))
+
     df['Minutos_Reaccion'] = df.apply(calc_reaction_minutes, axis=1)
 
     # -------------------------------------------------------------------------
@@ -657,7 +740,6 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
                 df.loc[idx, 'Minutos_En_Jornada'] = total_row_min
                 df.loc[idx, 'Minutos_Extra_PostTurno'] = 0.0
 
-    # Coordenadas Geográficas
     lats, lons = [], []
     for idx, row in df.iterrows():
         lat, lon = extract_lat_lon(row.get('Ubicacion_Fin'))
@@ -721,7 +803,7 @@ def multiselect_with_all(label, options, key_prefix, default_all=True):
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("## ⚡ Control Operativo BOL")
-    st.caption("Gestión de Turnos, Standby y Horas Extras")
+    st.caption("Gestión de Turnos, Standby, Nodos y Causas")
     st.markdown("---")
     
     st.markdown("**1. Enlace de Datos (Google Drive)**")
@@ -832,7 +914,7 @@ with st.sidebar:
     df_f = df_f[df_f['Clasificacion_Jornada'].isin(sel_jornadas)].copy()
 
     st.markdown("---")
-    st.markdown("**4. Filtros Geográficos y Operativos**")
+    st.markdown("**4. Filtros Geográficos, Operativos y Causa Raíz**")
     
     sel_sectores = multiselect_with_all("Sector(es):", df_f['Sector'].unique(), "sector")
     df_f = df_f[df_f['Sector'].isin(sel_sectores)].copy()
@@ -855,6 +937,12 @@ with st.sidebar:
 
     sel_estados = multiselect_with_all("Estado(s) de Actividad:", df_f['Estado_Actividad'].unique(), "estado")
     df_f = df_f[df_f['Estado_Actividad'].isin(sel_estados)].copy()
+
+    # Filtro global opcional por Causa Raíz
+    todas_causas_disp = sorted(list({c for lst in df_f['Lista_Causas_Raiz'] for c in lst}))
+    sel_causas_global = multiselect_with_all("Causa(s) Raíz Detectadas:", todas_causas_disp, "causas_glob")
+    if len(sel_causas_global) < len(todas_causas_disp):
+        df_f = df_f[df_f['Lista_Causas_Raiz'].apply(lambda lst: any(c in sel_causas_global for c in lst))].copy()
 
 
 # -----------------------------------------------------------------------------
@@ -1063,7 +1151,7 @@ tab_brigadas, tab_post, tab_zonas, tab_tiempos, tab_nodos, tab_obs, tab_mapa, ta
     "🌙 Auditoría Post-Turno y Casco Urbano",
     "🗺️ Desempeño Zonas Oficiales",
     "⏱️ Cola EGAM, Gantt y Disciplina WFM",
-    "⚡ Nodos Recurrentes",
+    "⚡ Nodos Recurrentes y Radar de Causas",
     "🔍 Observaciones y EGAM/RPA",
     "📍 Mapa y Trazabilidad",
     "📋 Base Consolidada"
@@ -1153,7 +1241,7 @@ with tab_brigadas:
             'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Turno_Detectado_Dia',
             'Clasificacion_Jornada', 'Entorno_Ubicacion', 'Orden_Trabajo', 'ID_Actividad',
             'Subtipo_Actividad', 'Estado_Actividad', 'Inicio', 'Finalización',
-            'Minutos_En_Jornada', 'Minutos_Extra_PostTurno', 'Horas_Extra_Orden', 'Observaciones'
+            'Minutos_En_Jornada', 'Minutos_Extra_PostTurno', 'Horas_Extra_Orden', 'Causas_Raiz_Texto', 'Observaciones'
         ]
         st.dataframe(
             df_post_inline[[c for c in cols_inline if c in df_post_inline.columns]].sort_values(by='Minutos_Extra_PostTurno', ascending=False),
@@ -1165,6 +1253,7 @@ with tab_brigadas:
                 "Minutos_En_Jornada": st.column_config.NumberColumn("Min. en Turno", format="%.0f m"),
                 "Minutos_Extra_PostTurno": st.column_config.NumberColumn("Min. Post-Turno", format="%.0f m"),
                 "Horas_Extra_Orden": st.column_config.NumberColumn("Horas Extras Orden", format="%.2f h"),
+                "Causas_Raiz_Texto": "Causas Detectadas",
                 "Observaciones": st.column_config.TextColumn("Observaciones", width="large")
             },
             use_container_width=True,
@@ -1248,7 +1337,7 @@ with tab_post:
         'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Turno_Detectado_Dia',
         'Clasificacion_Jornada', 'Entorno_Ubicacion', 'Orden_Trabajo', 'ID_Actividad',
         'Estado_Actividad', 'Inicio', 'Finalización', 'Minutos_En_Jornada',
-        'Minutos_Extra_PostTurno', 'Dirección', 'Descripcion_Orden', 'Observaciones'
+        'Minutos_Extra_PostTurno', 'Causas_Raiz_Texto', 'Dirección', 'Descripcion_Orden', 'Observaciones'
     ]
     st.dataframe(
         df_muni_view[[c for c in cols_muni_tbl if c in df_muni_view.columns]],
@@ -1300,7 +1389,7 @@ with tab_zonas:
 
     st.dataframe(zona_summary, use_container_width=True, hide_index=True)
 
-# ================= TAB 4: MEJORA A (COLA EGAM), MEJORA B (GANTT HORARIO) Y MEJORA C (DISCIPLINA WFM) =================
+# ================= TAB 4: COLA EGAM, GANTT HORARIO Y DISCIPLINA WFM =================
 with tab_tiempos:
     st.markdown("##### ⏳ Mejora A: Desglose de Demora — Cola de Despacho EGAM (Generación ➔ Asignación) vs. Reacción Brigada (Asignación ➔ Inicio)")
     col_t1, col_t2 = st.columns(2)
@@ -1344,9 +1433,6 @@ with tab_tiempos:
 
     st.markdown("---")
     st.markdown("##### 📅 Mejora B: Diagrama de Gantt / Línea de Tiempo Horaria (Detector de Vacíos Operativos entre Orden y Orden)")
-    st.caption("Visualiza barra por barra la ocupación real de cada brigada durante el día. Los espacios en blanco entre barras representan baches sin actividad.")
-    
-    # Usar df_contexto_turno para ver tanto las operativas como Alimentación / Inicio / Fin Turno en la línea de tiempo
     df_gantt = df_contexto_turno.dropna(subset=['DT_Inicio', 'DT_Fin']).copy()
     if not df_gantt.empty:
         fig_gantt = px.timeline(
@@ -1398,15 +1484,22 @@ with tab_tiempos:
         else:
             st.success("✅ No se detectaron descargos en '00000' ni órdenes operativas finalizadas sin GPS.")
 
-# ================= TAB 5: NODOS Y EQUIPOS RECURRENTES (CON AJUSTE VISUAL SOLICITADO) =================
+# ================= TAB 5: NODOS RECURRENTES Y RADAR MULTICAUSAL DE CAUSAS RAÍZ =================
 with tab_nodos:
-    st.markdown("##### ⚡ Detección de Nodos / Equipos Recurrentes para Visita Especializada")
-    st.caption("Extrae exactamente tal cual fueron reportados los códigos que inician por **6**, **PF**, **RB**, **RC**, **CD** o **S** en Observaciones, Comentarios, Descripción y Número de Descargo.")
+    st.markdown("##### ⚡ Detección de Nodos / Equipos Recurrentes y Radar Multicausal de Fallas")
+    st.caption(
+        "Extrae los nodos (`6...`, `PF...`, `RB...`, `RC...`, `CD...`, `S...`) tal cual fueron reportados y suma todas las causas raíz combinadas en cada aviso "
+        "(Vegetación, Deterioro de Material, Lluvias, Vientos, Descargas Atmosféricas, Animales, Terceros y Variación BT)."
+    )
 
-    rows_nodos = []
+    # Expandir Nodos + Causas (Si un aviso en el nodo S00058 tuvo Lluvias + Vegetación, suma ambas causas)
+    rows_nodos_flat = []
+    rows_nodos_causas = []
+
     for idx, r in df_f.iterrows():
+        causas_aviso = r['Lista_Causas_Raiz']
         for nd in r['Lista_Nodos']:
-            rows_nodos.append({
+            rows_nodos_flat.append({
                 'Nodo_Equipo': nd,
                 'Tipo_Equipo': classify_node_type(nd),
                 'Sector': r['Sector'],
@@ -1416,36 +1509,74 @@ with tab_nodos:
                 'Orden_Trabajo': r['Orden_Trabajo'],
                 'ID_Actividad': r['ID_Actividad'],
                 'Estado_Actividad': r['Estado_Actividad'],
+                'Causas_Aviso': " | ".join(causas_aviso),
+                'Lista_Causas': causas_aviso,
                 'Numero_Descargo': r['Numero_Descargo'],
                 'Observaciones': r['Observaciones']
             })
+            for c_item in causas_aviso:
+                rows_nodos_causas.append({
+                    'Nodo_Equipo': nd,
+                    'Tipo_Equipo': classify_node_type(nd),
+                    'Sector': r['Sector'],
+                    'Zona_Oficial': r['Zona_Oficial'],
+                    'Recurso': r['Recurso'],
+                    'Causa_Raiz': c_item,
+                    'ID_Actividad': r['ID_Actividad'],
+                    'Orden_Trabajo': r['Orden_Trabajo']
+                })
 
-    if rows_nodos:
-        df_nodos_exp = pd.DataFrame(rows_nodos)
-        c_nd1, c_nd2 = st.columns(2)
+    if rows_nodos_flat:
+        df_nodos_exp = pd.DataFrame(rows_nodos_flat)
+        df_nc_exp = pd.DataFrame(rows_nodos_causas)
+
+        # FILTROS INTERACTIVOS DE ZOOM (FAMILIA, CAUSA RAÍZ Y CÓDIGO DE NODO)
+        c_nd1, c_nd2, c_nd3 = st.columns([1, 1.2, 1])
         with c_nd1:
             tipos_eq = ["Todos"] + sorted(df_nodos_exp['Tipo_Equipo'].unique().tolist())
-            sel_tipo_eq = st.selectbox("Filtrar por Familia de Equipo:", tipos_eq)
+            sel_tipo_eq = st.selectbox("1. Filtrar por Familia de Equipo:", tipos_eq)
         with c_nd2:
-            buscar_nodo = st.text_input("Buscar código exacto de Nodo/Equipo (ej. RB1950, CD23329, 65922036):", "")
+            causas_disp_nd = sorted(df_nc_exp['Causa_Raiz'].unique().tolist())
+            sel_causas_nd = st.multiselect(
+                "2. Hacer Zoom por Causa(s) Raíz:",
+                options=causas_disp_nd,
+                default=[],
+                placeholder="Todas las causas (o elige ej. Vegetación, Animales)..."
+            )
+        with c_nd3:
+            buscar_nodo = st.text_input("3. Buscar Código Exacto de Nodo:", placeholder="Ej: RB1950, CD23329, S00058...")
 
         df_nodos_filt = df_nodos_exp.copy()
+        df_nc_filt = df_nc_exp.copy()
+
         if sel_tipo_eq != "Todos":
             df_nodos_filt = df_nodos_filt[df_nodos_filt['Tipo_Equipo'] == sel_tipo_eq]
-        if buscar_nodo.strip():
-            df_nodos_filt = df_nodos_filt[df_nodos_filt['Nodo_Equipo'].str.contains(buscar_nodo.strip().upper(), na=False)]
+            df_nc_filt = df_nc_filt[df_nc_filt['Tipo_Equipo'] == sel_tipo_eq]
 
+        if sel_causas_nd:
+            df_nodos_filt = df_nodos_filt[df_nodos_filt['Lista_Causas'].apply(lambda lst: any(c in sel_causas_nd for c in lst))]
+            df_nc_filt = df_nc_filt[df_nc_filt['Causa_Raiz'].isin(sel_causas_nd)]
+
+        if buscar_nodo.strip():
+            q_nd = buscar_nodo.strip().upper()
+            df_nodos_filt = df_nodos_filt[df_nodos_filt['Nodo_Equipo'].str.contains(q_nd, na=False)]
+            df_nc_filt = df_nc_filt[df_nc_filt['Nodo_Equipo'].str.contains(q_nd, na=False)]
+
+        # Agrupar resumen por Nodo único
         resumen_nodos = df_nodos_filt.groupby(['Nodo_Equipo', 'Tipo_Equipo', 'Sector', 'Zona_Oficial']).agg(
             Veces_Intervenido=('ID_Actividad', 'count'),
+            Causas_Acumuladas=('Lista_Causas', lambda s: " | ".join(sorted({c for lst in s for c in lst}))),
             Ordenes_Asociadas=('Orden_Trabajo', lambda s: ", ".join(sorted(set(s)))),
             Brigadas_Que_Asistieron=('Recurso', lambda s: ", ".join(sorted(set(s)))),
             Fechas=('Fecha_Str', lambda s: ", ".join(sorted(set(s))))
         ).reset_index().sort_values(by='Veces_Intervenido', ascending=False)
 
-        # GRÁFICOS SOLICITADOS: CIRCULAR CON % (FAMILIAS) + BARRAS VERTICALES (NODO_EQUIPO EN EJE X, CANTIDAD EN EJE Y)
-        col_ng1, col_ng2 = st.columns([1, 1.35])
+        resumen_nodos['Accion_Recomendada'] = resumen_nodos['Causas_Acumuladas'].apply(recommend_action_from_causes)
+
+        # FILA 1 DE GRÁFICOS: DONUT POR FAMILIA (%) + BARRAS VERTICALES DE NODOS COLOREADAS POR CAUSA RAÍZ
+        col_ng1, col_ng2 = st.columns([1, 1.45])
         with col_ng1:
-            st.markdown("###### 📊 Distribución Porcentual por Familia (`RB/RC`, `PF/6`, `S`, `CD`)")
+            st.markdown("###### 📊 Porcentaje por Familia (`RB/RC`, `PF/6`, `S`, `CD`)")
             tipo_cnt = resumen_nodos.groupby('Tipo_Equipo')['Veces_Intervenido'].sum().reset_index()
             fig_tp_nd = px.pie(
                 tipo_cnt,
@@ -1465,32 +1596,85 @@ with tab_nodos:
             st.plotly_chart(fig_tp_nd, use_container_width=True)
 
         with col_ng2:
-            st.markdown("###### 🔥 Top 20 Nodos / Equipos Recurrentes (Eje X: `Nodo_Equipo` | Eje Y: `Cantidad de Veces`)")
-            top_20_nodos = resumen_nodos.head(20)
+            st.markdown("###### 🔥 Top 20 Nodos Recurrentes Desglosados por Causa Raíz (`Nodo_Equipo` en Eje X)")
+            top_20_names = resumen_nodos.head(20)['Nodo_Equipo'].tolist()
+            df_top20_nc = df_nc_filt[df_nc_filt['Nodo_Equipo'].isin(top_20_names)].groupby(
+                ['Nodo_Equipo', 'Causa_Raiz', 'Zona_Oficial']
+            ).size().reset_index(name='Incidencias')
+
             fig_nodos = px.bar(
-                top_20_nodos,
+                df_top20_nc,
                 x='Nodo_Equipo',
-                y='Veces_Intervenido',
-                color='Tipo_Equipo',
-                text='Veces_Intervenido',
-                hover_data=['Zona_Oficial', 'Brigadas_Que_Asistieron', 'Ordenes_Asociadas'],
-                labels={'Nodo_Equipo': 'Código Nodo / Equipo', 'Veces_Intervenido': 'Cantidad de Intervenciones'},
-                color_discrete_map={
-                    "Reconectador (RB / RC)": "#2563eb",
-                    "Cortacircuito / Transformador (CD)": "#f59e0b",
-                    "Seccionamiento (S)": "#10b981",
-                    "Punto Físico / Nodo (6 / PF)": "#7c3aed"
-                }
+                y='Incidencias',
+                color='Causa_Raiz',
+                barmode='stack',
+                text='Incidencias',
+                category_orders={'Nodo_Equipo': top_20_names},
+                hover_data=['Zona_Oficial'],
+                color_discrete_map=COLORES_CAUSAS,
+                labels={'Nodo_Equipo': 'Código Nodo / Equipo', 'Incidencias': 'Cantidad (Suma de Causas)'}
             )
-            fig_nodos.update_traces(textposition='outside')
-            fig_nodos.update_layout(xaxis_tickangle=-45, height=390, margin=dict(t=25, b=40, l=10, r=10), legend=dict(orientation="h", y=1.12))
+            fig_nodos.update_layout(xaxis_tickangle=-45, height=390, margin=dict(t=15, b=40, l=10, r=10), legend=dict(orientation="h", y=1.15))
             st.plotly_chart(fig_nodos, use_container_width=True)
 
-        st.markdown("###### 📋 Priorización de Nodos para Programar Visita Especializada")
-        st.dataframe(resumen_nodos, use_container_width=True, hide_index=True)
+        # FILA 2 DE GRÁFICOS: RADAR EJECUTIVO DE CAUSAS + MATRIZ DE CAUSAS POR ZONA OFICIAL
+        st.markdown("---")
+        col_rad1, col_rad2 = st.columns([1, 1.35])
+        with col_rad1:
+            st.markdown("###### 🎯 Radar Multicausal de Fallas en Nodos")
+            radar_cnt = df_nc_filt['Causa_Raiz'].value_counts().reset_index()
+            radar_cnt.columns = ['Causa', 'Frecuencia']
+            if not radar_cnt.empty:
+                fig_radar = px.line_polar(
+                    radar_cnt,
+                    r='Frecuencia',
+                    theta='Causa',
+                    line_close=True,
+                    markers=True
+                )
+                fig_radar.update_traces(fill='toself', line_color='#2563eb')
+                fig_radar.update_layout(height=360, margin=dict(t=25, b=25, l=40, r=40))
+                st.plotly_chart(fig_radar, use_container_width=True)
 
-        with st.expander("🔎 Ver Detalle Técnico Completo de las Órdenes por Nodo"):
-            st.dataframe(df_nodos_filt, use_container_width=True, hide_index=True)
+        with col_rad2:
+            st.markdown("###### 🗺️ Causas de Falla en Nodos por Zona Oficial (¿Qué golpea a cada Municipio?)")
+            zona_causa_cnt = df_nc_filt.groupby(['Zona_Oficial', 'Causa_Raiz']).size().reset_index(name='Eventos')
+            fig_zc = px.bar(
+                zona_causa_cnt,
+                x='Zona_Oficial',
+                y='Eventos',
+                color='Causa_Raiz',
+                barmode='stack',
+                text='Eventos',
+                color_discrete_map=COLORES_CAUSAS,
+                labels={'Zona_Oficial': 'Zona Oficial / Municipio', 'Eventos': 'Frecuencia de Causa'}
+            )
+            fig_zc.update_layout(xaxis_tickangle=-35, height=360, margin=dict(t=15, b=30, l=10, r=10), legend=dict(orientation="h", y=1.15))
+            st.plotly_chart(fig_zc, use_container_width=True)
+
+        st.markdown("###### 📋 Priorización de Nodos y Acción Especializada Recomendada")
+        st.dataframe(
+            resumen_nodos[[
+                'Nodo_Equipo', 'Tipo_Equipo', 'Sector', 'Zona_Oficial',
+                'Veces_Intervenido', 'Causas_Acumuladas', 'Accion_Recomendada',
+                'Brigadas_Que_Asistieron', 'Ordenes_Asociadas', 'Fechas'
+            ]],
+            column_config={
+                "Nodo_Equipo": "Nodo / Equipo",
+                "Veces_Intervenido": "Veces",
+                "Causas_Acumuladas": st.column_config.TextColumn("Causas Detectadas (Suma Multicausal)", width="medium"),
+                "Accion_Recomendada": st.column_config.TextColumn("Acción Especializada Sugerida", width="large")
+            },
+            use_container_width=True,
+            hide_index=True
+        )
+
+        with st.expander("🔎 Ver Detalle Técnico Completo de las Órdenes por Nodo y Causa"):
+            st.dataframe(
+                df_nodos_filt.drop(columns=['Lista_Causas'], errors='ignore'),
+                use_container_width=True,
+                hide_index=True
+            )
     else:
         st.info("No se detectaron códigos de nodos en la selección actual.")
 
@@ -1524,7 +1708,7 @@ with tab_obs:
             st.plotly_chart(fig_mot_c, use_container_width=True)
 
     st.markdown("---")
-    st.markdown("##### 🔎 Buscador Rápido por Orden de Trabajo, ID de Actividad y Observaciones")
+    st.markdown("##### 🔎 Buscador Rápido por Orden de Trabajo, ID de Actividad, Causa Raíz y Observaciones")
     col_s1, col_s2, col_s3 = st.columns(3)
     with col_s1:
         buscar_ot_obs = st.text_input("📋 Buscar por Orden de Trabajo o ID Actividad:", "")
@@ -1556,7 +1740,8 @@ with tab_obs:
     cols_obs_table = [c for c in [
         'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso',
         'Orden_Trabajo', 'ID_Actividad', 'Subtipo_Actividad',
-        'Estado_Actividad', 'Clasificacion_Jornada', 'Origen_Cancelacion', 'Nodos_Detectados',
+        'Estado_Actividad', 'Clasificacion_Jornada', 'Origen_Cancelacion',
+        'Nodos_Detectados', 'Causas_Raiz_Texto',
         'Observaciones', 'Comentarios_Cancelacion', 'Comentarios_Suspension', 'Descripcion_Orden'
     ] if c in df_obs_view.columns]
     
@@ -1603,7 +1788,7 @@ with tab_mapa:
                 df_map['Etiqueta_Parada'] = "Parada #" + df_map['Orden_Secuencia'].astype(str) + " (" + df_map['Inicio'].fillna('--:--').astype(str) + ")"
 
             color_map_estados = {'Finalizada': '#10b981', 'Cancelada': '#ef4444', 'Suspendida': '#f59e0b', 'No realizado': '#64748b'}
-            hover_cols_map = ['Orden_Trabajo', 'ID_Actividad', 'Zona_Oficial', 'Clasificacion_Jornada', 'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Nodos_Detectados', 'Observaciones']
+            hover_cols_map = ['Orden_Trabajo', 'ID_Actividad', 'Zona_Oficial', 'Clasificacion_Jornada', 'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Nodos_Detectados', 'Causas_Raiz_Texto', 'Observaciones']
             if ver_trazabilidad:
                 hover_cols_map = ['Etiqueta_Parada'] + hover_cols_map
 
@@ -1625,16 +1810,16 @@ with tab_mapa:
             st.plotly_chart(fig_map, use_container_width=True)
 
             if ver_trazabilidad:
-                st.dataframe(df_map[['Orden_Secuencia', 'Recurso', 'Fecha_Str', 'Orden_Trabajo', 'ID_Actividad', 'Clasificacion_Jornada', 'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Observaciones']], use_container_width=True, hide_index=True)
+                st.dataframe(df_map[['Orden_Secuencia', 'Recurso', 'Fecha_Str', 'Orden_Trabajo', 'ID_Actividad', 'Clasificacion_Jornada', 'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Causas_Raiz_Texto', 'Observaciones']], use_container_width=True, hide_index=True)
 
 # ================= TAB 8: BASE CONSOLIDADA Y AUDITORÍA =================
 with tab_datos:
-    st.markdown("##### 📋 Registros Consolidados con Clasificación de Turno, Horas Extras, Cola EGAM, Nodos y Observaciones")
+    st.markdown("##### 📋 Registros Consolidados con Clasificación de Turno, Horas Extras, Cola EGAM, Nodos, Causas y Observaciones")
     cols_auditoria = [c for c in [
         'Fecha_Str', 'Anio', 'Mes_Nombre', 'Sector', 'Zona_Oficial', 'Recurso',
         'Turno_Detectado_Dia', 'Clasificacion_Jornada', 'Entorno_Ubicacion',
         'Orden_Trabajo', 'ID_Actividad', 'Numero_Descargo', 'Subtipo_Actividad', 'Estado_Actividad',
-        'Origen_Cancelacion', 'Nodos_Detectados',
+        'Origen_Cancelacion', 'Nodos_Detectados', 'Causas_Raiz_Texto',
         'Fecha_Generacion', 'Hora_Asignacion', 'Inicio', 'Finalización',
         'Minutos_Cola_EGAM', 'Minutos_Reaccion', 'Minutos_Viaje', 'Minutos_Duracion',
         'Minutos_En_Jornada', 'Minutos_Extra_PostTurno',
