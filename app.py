@@ -219,7 +219,7 @@ COLORES_RAYOS_X = {
 }
 
 # -----------------------------------------------------------------------------
-# 4. FUNCIONES DE LECTURA Y PROCESAMIENTO (INTACTO)
+# 4. FUNCIONES DE LECTURA Y PROCESAMIENTO (INTACTO Y BLINDADO)
 # -----------------------------------------------------------------------------
 def convert_time_to_minutes(time_val):
     if pd.isna(time_val):
@@ -250,7 +250,11 @@ def hour_str_to_min_of_day(val):
 def min_of_day_to_hhmm(m_val):
     if pd.isna(m_val):
         return "--:--"
-    m_int = int(round(float(m_val))) % 1440
+    m_int = int(round(float(m_val)))
+    if m_int >= 1439:
+        return "23:59"
+    if m_int <= 0:
+        return "00:00"
     return f"{m_int // 60:02d}:{m_int % 60:02d}"
 
 
@@ -297,28 +301,53 @@ def get_shift_profile(recurso_base: str):
     return ("Fijo 07:00-15:00 (7h netas)", "FIJO", 7*60, 15*60, 7.0)
 
 
-def infer_daily_shift_window(tipo_turno, min_ini_fijo, min_fin_fijo, mins_inicio_dia):
+def infer_daily_shift_window_from_group(tipo_turno, min_ini_fijo, min_fin_fijo, group_df: pd.DataFrame):
+    """
+    Detecta con precisión milimétrica el turno real del día sin confundir el cierre ('Fin Turno')
+    con la entrada al turno nocturno.
+    Prioriza siempre la hora de 'Inicio Turno' (franjas 06:00, 14:00, 22:00).
+    """
     if tipo_turno in {"FIJO", "FIJO_BOLE"}:
         return min_ini_fijo, min_fin_fijo, f"{min_ini_fijo//60:02d}:{min_ini_fijo%60:02d} a {min_fin_fijo//60:02d}:{min_fin_fijo%60:02d}"
-    
-    valid_mins = [m for m in mins_inicio_dia if pd.notna(m)]
-    first_m = min(valid_mins) if valid_mins else 360
+
+    # 1. Buscar la actividad explícita 'Inicio Turno'
+    ini_turno_rows = group_df[group_df['Subtipo_Actividad'].astype(str).str.upper() == 'INICIO TURNO']
+    ini_turno_mins = [m for m in ini_turno_rows['Ini_Min_Dia'].tolist() if pd.notna(m)]
+
+    # 2. Excluir 'Fin Turno' y 'Alimentación' para nunca confundir la hora de salida con hora de entrada
+    act_validas = group_df[~group_df['Subtipo_Actividad'].astype(str).str.upper().isin(['FIN TURNO', 'ALIMENTACIÓN', 'ALIMENTACION'])]
+    op_mins = [m for m in act_validas['Ini_Min_Dia'].tolist() if pd.notna(m)]
+
+    # Hora ancla de entrada del turno
+    if ini_turno_mins:
+        ref_min = min(ini_turno_mins)
+    elif op_mins:
+        ref_min = min(op_mins)
+    else:
+        all_m = [m for m in group_df['Ini_Min_Dia'].tolist() if pd.notna(m)]
+        ref_min = min(all_m) if all_m else 360
 
     if tipo_turno == "ROTATIVO_2T":
-        if first_m < 11 * 60 + 30:
-            return 6*60, 14*60, "Turno 1 (06:00 a 14:00)"
-        else:
-            return 14*60, 22*60, "Turno 2 (14:00 a 22:00)"
-
-    if tipo_turno == "ROTATIVO_3T":
-        has_night = any(m >= 21*60 + 30 or m < 5*60 for m in valid_mins)
-        has_morning = any(5*60 <= m < 11*60 + 30 for m in valid_mins)
-        if has_night and not has_morning:
-            return 22*60, 30*60, "Turno 3 Nocturno (22:00 a 06:00)"
-        elif first_m < 11*60 + 30:
+        # Turno 1: entra ~06:00 (entre 04:00 y 11:30) | Turno 2: entra ~14:00 (después de las 11:30)
+        if ref_min < 11 * 60 + 30:
             return 6*60, 14*60, "Turno 1 Mañana (06:00 a 14:00)"
         else:
             return 14*60, 22*60, "Turno 2 Tarde (14:00 a 22:00)"
+
+    if tipo_turno == "ROTATIVO_3T":
+        # Franja Turno 1 Mañana (06:00 a 14:00): Inicio Turno alrededor de las 06:00 (04:30 a 11:29)
+        if 4 * 60 + 30 <= ref_min < 11 * 60 + 30:
+            return 6*60, 14*60, "Turno 1 Mañana (06:00 a 14:00)"
+        # Franja Turno 2 Tarde (14:00 a 22:00): Inicio Turno alrededor de las 14:00 (11:30 a 19:29)
+        elif 11 * 60 + 30 <= ref_min < 19 * 60 + 30:
+            return 14*60, 22*60, "Turno 2 Tarde (14:00 a 22:00)"
+        # Franja Turno 3 Nocturno (22:00 a 06:00):
+        # Si inicia en la noche (>= 19:30, ej. 22:00) -> ventana nocturna de ese día (22:00 a 23:59)
+        elif ref_min >= 19 * 60 + 30:
+            return 22*60, 24*60, "Turno 3 Nocturno (22:00 a 06:00)"
+        # Si viene trabajando de madrugada (00:00 a 04:29) cerrando el Turno 3 que inició la noche anterior
+        else:
+            return 0, 6*60, "Turno 3 Madrugada (00:00 a 06:00)"
 
     return 7*60, 15*60, "07:00 a 15:00"
 
@@ -326,12 +355,7 @@ def infer_daily_shift_window(tipo_turno, min_ini_fijo, min_fin_fijo, mins_inicio
 def build_continuous_shift_xray(df_day_all: pd.DataFrame, umbral_bache_min: float = 5.0):
     """
     Construye la Barra Cronológica Continua del Turno (Rayos X de la Jornada)
-    desglosando para cada brigada y fecha:
-    1) 🟦 Desplazamiento / En Ruta
-    2) 🟩 Tiempo Operativo en Terreno (En el Daño)
-    3) 🟨 Rutina / Alimentación / Charla SST
-    4) 🟪 Tiempo Extendido / Post-Turno (Extra)
-    5) 🟧 Tiempo Muerto / Bache Sin Actividad (>= umbral_bache_min)
+    respetando estrictamente la ventana del turno detectado (sin inventar baches después de cerrar turno).
     """
     bloques = []
     if df_day_all.empty:
@@ -341,13 +365,11 @@ def build_continuous_shift_xray(df_day_all: pd.DataFrame, umbral_bache_min: floa
         rec_b = grp['Recurso_Base'].iloc[0]
         zona_of = grp['Zona_Oficial'].iloc[0]
         _, t_turno, m_ini_fijo, m_fin_fijo, _ = get_shift_profile(rec_b)
-        w_ini, w_fin, label_turno = infer_daily_shift_window(
-            t_turno, m_ini_fijo, m_fin_fijo, grp['Ini_Min_Dia'].tolist()
+        w_ini, w_fin, label_turno = infer_daily_shift_window_from_group(
+            t_turno, m_ini_fijo, m_fin_fijo, grp
         )
-        # Limitar ventana diurna estándar para trazado en el día
-        w_fin_dia = min(w_fin, 1439)
+        w_fin_dia = min(float(w_fin), 1439.0)
 
-        # Filtrar filas que tienen hora de Inicio y Finalización válidas
         valid_rows = grp.dropna(subset=['Ini_Min_Dia', 'Fin_Min_Dia']).copy()
         if valid_rows.empty:
             continue
@@ -366,7 +388,7 @@ def build_continuous_shift_xray(df_day_all: pd.DataFrame, umbral_bache_min: floa
             obs_txt = str(r.get('Observaciones', ''))
             es_rutina = (r.get('Categoria_Labor') == 'Rutina / Administrativa')
 
-            # Bloque de Viaje (si aplica)
+            # 1. Bloque de Desplazamiento / Ruta
             if viaje_m >= 1.0 and ini_sitio > ini_viaje:
                 eventos_reales.append({
                     'min_start': ini_viaje,
@@ -378,22 +400,35 @@ def build_continuous_shift_xray(df_day_all: pd.DataFrame, umbral_bache_min: floa
                     'obs': obs_txt
                 })
 
-            # Bloque de Ejecución en Sitio / Rutina / Post-Turno
+            # 2. Bloque de Ejecución en Sitio / Rutina / Post-Turno
             dur_visual = max(1.0, fin_sitio - ini_sitio)
             fin_sitio_adj = ini_sitio + dur_visual
 
             if es_rutina:
-                t_blq = "🟨 Rutina / Alimentación / Charla SST"
-            elif ini_sitio >= w_fin_dia:
-                t_blq = "🟪 Tiempo Extendido / Post-Turno (Extra)"
-            else:
-                t_blq = "🟩 Tiempo Operativo en Terreno (En el Daño)"
-
-            # Si una orden operativa cruza exactamente el fin de turno (w_fin_dia), partir en Terreno + Post-Turno
-            if (not es_rutina) and (ini_sitio < w_fin_dia) and (fin_sitio_adj > w_fin_dia):
                 eventos_reales.append({
                     'min_start': ini_sitio,
-                    'min_end': float(w_fin_dia),
+                    'min_end': fin_sitio_adj,
+                    'tipo_bloque': "🟨 Rutina / Alimentación / Charla SST",
+                    'detalle': f"{sub_act} ({ot_code})",
+                    'orden': ot_code,
+                    'id_act': id_act,
+                    'obs': obs_txt
+                })
+            elif ini_sitio >= w_fin_dia or fin_sitio_adj <= float(w_ini):
+                eventos_reales.append({
+                    'min_start': ini_sitio,
+                    'min_end': fin_sitio_adj,
+                    'tipo_bloque': "🟪 Tiempo Extendido / Post-Turno (Extra)",
+                    'detalle': f"{sub_act} ({ot_code}) - Post-Turno",
+                    'orden': ot_code,
+                    'id_act': id_act,
+                    'obs': obs_txt
+                })
+            elif ini_sitio < w_fin_dia and fin_sitio_adj > w_fin_dia:
+                # Parte dentro del turno (hasta w_fin_dia) y parte Post-Turno (después de w_fin_dia)
+                eventos_reales.append({
+                    'min_start': ini_sitio,
+                    'min_end': w_fin_dia,
                     'tipo_bloque': "🟩 Tiempo Operativo en Terreno (En el Daño)",
                     'detalle': f"{sub_act} ({ot_code}) - En Turno",
                     'orden': ot_code,
@@ -401,10 +436,10 @@ def build_continuous_shift_xray(df_day_all: pd.DataFrame, umbral_bache_min: floa
                     'obs': obs_txt
                 })
                 eventos_reales.append({
-                    'min_start': float(w_fin_dia),
+                    'min_start': w_fin_dia,
                     'min_end': fin_sitio_adj,
                     'tipo_bloque': "🟪 Tiempo Extendido / Post-Turno (Extra)",
-                    'detalle': f"{sub_act} ({ot_code}) - Tiempo Extendido",
+                    'detalle': f"{sub_act} ({ot_code}) - Tiempo Extendido Post-Turno",
                     'orden': ot_code,
                     'id_act': id_act,
                     'obs': obs_txt
@@ -413,7 +448,7 @@ def build_continuous_shift_xray(df_day_all: pd.DataFrame, umbral_bache_min: floa
                 eventos_reales.append({
                     'min_start': ini_sitio,
                     'min_end': fin_sitio_adj,
-                    'tipo_bloque': t_blq,
+                    'tipo_bloque': "🟩 Tiempo Operativo en Terreno (En el Daño)",
                     'detalle': f"{sub_act} ({ot_code})",
                     'orden': ot_code,
                     'id_act': id_act,
@@ -423,39 +458,39 @@ def build_continuous_shift_xray(df_day_all: pd.DataFrame, umbral_bache_min: floa
         if not eventos_reales:
             continue
 
-        # Ordenar cronológicamente por minuto de inicio
         eventos_reales = sorted(eventos_reales, key=lambda x: (x['min_start'], x['min_end']))
 
-        # Cursor desde el inicio oficial del turno (o primera actividad si empezó antes)
-        cursor = float(min(w_ini, eventos_reales[0]['min_start']))
+        # El cursor de evaluación de tiempos muertos inicia en la hora oficial del turno (w_ini)
+        cursor = float(w_ini)
 
         secuencia_completa = []
         for ev in eventos_reales:
             s_m = ev['min_start']
             e_m = ev['min_end']
 
-            # Si hay un hueco >= umbral_bache_min dentro del horario de turno antes del evento actual
-            if s_m > cursor:
-                fin_hueco = min(s_m, float(w_fin_dia))
-                if fin_hueco - cursor >= umbral_bache_min:
+            # Evaluar baches únicamente DENTRO de la ventana oficial del turno [w_ini, w_fin_dia]
+            if s_m > cursor and cursor < w_fin_dia:
+                inicio_hueco = max(cursor, float(w_ini))
+                fin_hueco = min(s_m, w_fin_dia)
+                if (fin_hueco - inicio_hueco) >= umbral_bache_min:
                     secuencia_completa.append({
-                        'min_start': cursor,
+                        'min_start': inicio_hueco,
                         'min_end': fin_hueco,
                         'tipo_bloque': "🟧 Tiempo Muerto / Bache Sin Actividad (>= 5m)",
-                        'detalle': f"⚠️ Bache sin actividad ({int(round(fin_hueco - cursor))} min)",
+                        'detalle': f"⚠️ Bache sin actividad ({int(round(fin_hueco - inicio_hueco))} min)",
                         'orden': "SIN ACTIVIDAD ACTIVA",
                         'id_act': "-",
-                        'obs': f"Ventana sin viaje ni maniobra de {min_of_day_to_hhmm(cursor)} a {min_of_day_to_hhmm(fin_hueco)}"
+                        'obs': f"Ventana sin viaje ni maniobra de {min_of_day_to_hhmm(inicio_hueco)} a {min_of_day_to_hhmm(fin_hueco)}"
                     })
 
             secuencia_completa.append(ev)
             cursor = max(cursor, e_m)
 
-        # Si terminó su última actividad antes del fin oficial de su turno, agregar el bache final hasta el cierre de turno
-        if cursor < float(w_fin_dia) and (float(w_fin_dia) - cursor) >= umbral_bache_min:
+        # Si la última actividad del día terminó ANTES de la hora oficial de cierre (w_fin_dia), marcar bache hasta w_fin_dia
+        if cursor < w_fin_dia and (w_fin_dia - cursor) >= umbral_bache_min:
             secuencia_completa.append({
                 'min_start': cursor,
-                'min_end': float(w_fin_dia),
+                'min_end': w_fin_dia,
                 'tipo_bloque': "🟧 Tiempo Muerto / Bache Sin Actividad (>= 5m)",
                 'detalle': f"⚠️ Bache final hasta cierre de turno ({int(round(w_fin_dia - cursor))} min)",
                 'orden': "SIN ACTIVIDAD ACTIVA",
@@ -463,7 +498,6 @@ def build_continuous_shift_xray(df_day_all: pd.DataFrame, umbral_bache_min: floa
                 'obs': f"Sin actividades reportadas desde {min_of_day_to_hhmm(cursor)} hasta fin de turno ({min_of_day_to_hhmm(w_fin_dia)})"
             })
 
-        # Convertir cada bloque a Datetime para Plotly Timeline
         base_dt = pd.to_datetime(f_str)
         for item in secuencia_completa:
             dur_m = round(item['min_end'] - item['min_start'], 1)
@@ -863,8 +897,8 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
         rec_b = group['Recurso_Base'].iloc[0]
         _, t_turno, m_ini_fijo, m_fin_fijo, _ = get_shift_profile(rec_b)
         
-        w_ini, w_fin, label_turno = infer_daily_shift_window(
-            t_turno, m_ini_fijo, m_fin_fijo, group['Ini_Min_Dia'].tolist()
+        w_ini, w_fin, label_turno = infer_daily_shift_window_from_group(
+            t_turno, m_ini_fijo, m_fin_fijo, group
         )
         df.loc[group.index, 'Turno_Detectado_Dia'] = label_turno
 
@@ -890,12 +924,6 @@ def clean_dataframe(df: pd.DataFrame, source_name: str = "") -> pd.DataFrame:
             if pd.isna(ini_m) and pd.isna(fin_m):
                 df.loc[idx, 'Clasificacion_Jornada'] = "Sin Hora Inicio (Cancelada / Pendiente)"
                 df.loc[idx, 'Minutos_En_Jornada'] = 0.0
-                df.loc[idx, 'Minutos_Extra_PostTurno'] = 0.0
-                continue
-
-            if w_fin > 1440:
-                df.loc[idx, 'Clasificacion_Jornada'] = "En Jornada Ordinaria"
-                df.loc[idx, 'Minutos_En_Jornada'] = total_row_min
                 df.loc[idx, 'Minutos_Extra_PostTurno'] = 0.0
                 continue
 
@@ -1641,15 +1669,14 @@ with tab_labores:
     else:
         st.info("No hay actividades operativas de daños u OT en la selección actual.")
 
-# ================= TAB 5: RAYOS X CONTINUO DEL TURNO (DESDE MINUTO 5), COLA EGAM Y DISCIPLINA WFM =================
+# ================= TAB 5: RAYOS X CONTINUO DEL TURNO, RESUMEN POR ESTADO, COLA EGAM Y DISCIPLINA WFM =================
 with tab_tiempos:
     st.markdown("##### 🔬 Rayos X de la Jornada: Barra Cronológica Continua del Turno (De Inicio a Fin de Turno)")
     st.caption(
-        "Visualiza qué hizo exactamente un recurso (o varios recursos) en un día específico desde que abrió turno hasta que cerró. "
-        "Todo vacío sin viaje ni atención de **5 minutos en adelante** se marca automáticamente en naranja como **🟧 Tiempo Muerto / Bache Sin Actividad**."
+        "Audita qué hizo exactamente una brigada (o varias) en un día específico dentro de su turno real (6-14h, 14-22h, 22-06h, 7-15h, etc.). "
+        "Todo vacío sin viaje ni atención de **5 minutos en adelante** dentro de su horario se marca automáticamente como **🟧 Tiempo Muerto / Bache Sin Actividad**."
     )
 
-    # Controles exclusivos para inspeccionar 1 solo día y 1 o varios recursos con total claridad
     fechas_xray_disp = sorted(df_contexto_turno['Fecha_Str'].unique().tolist())
     col_x1, col_x2, col_x3 = st.columns([1, 1.8, 1])
     with col_x1:
@@ -1670,10 +1697,54 @@ with tab_tiempos:
     if sel_recs_xray:
         df_dia_xray = df_dia_xray[df_dia_xray['Recurso'].isin(sel_recs_xray)].copy()
 
+    # -------------------------------------------------------------------------
+    # NUEVO APARTADO SOLICITADO: CONTEO DE ACTIVIDADES DENTRO DEL TURNO Y SUS ESTADOS
+    # -------------------------------------------------------------------------
+    df_op_dia = df_dia_xray[df_dia_xray['Categoria_Labor'] == 'Operativa (Daños / OT)'].copy()
+    if not df_op_dia.empty:
+        st.markdown("###### 📊 Resumen de Actividades Operativas Realizadas en el Turno y sus Estados")
+        resumen_turno_estados = df_op_dia.groupby(['Recurso', 'Zona_Oficial', 'Turno_Detectado_Dia']).agg(
+            Total_Ordenes=('ID_Actividad', 'count'),
+            Dentro_Del_Turno=('Clasificacion_Jornada', lambda s: (s.isin(["En Jornada Ordinaria", "⏱️ Caso A: Tiempo Extendido (Cruza Hora Fin de Turno)"])).sum()),
+            Post_Turno_Reactivadas=('Clasificacion_Jornada', lambda s: (s == "🌙 Caso B: Reactivación Post-Turno (Inicia Después del Turno)").sum()),
+            Finalizadas=('Estado_Actividad', lambda s: (s.str.lower() == 'finalizada').sum()),
+            Canceladas=('Estado_Actividad', lambda s: (s.str.lower() == 'cancelada').sum()),
+            Suspendidas=('Estado_Actividad', lambda s: (s.str.lower() == 'suspendida').sum()),
+            No_Realizadas=('Estado_Actividad', lambda s: (s.str.lower() == 'no realizado').sum()),
+            Pendientes=('Estado_Actividad', lambda s: (s.str.lower() == 'pendiente').sum())
+        ).reset_index()
+
+        # Tarjetas resumen de estados de la selección actual
+        ce1, ce2, ce3, ce4, ce5, ce6 = st.columns(6)
+        ce1.metric("📋 Total Órdenes Día", int(resumen_turno_estados['Total_Ordenes'].sum()))
+        ce2.metric("🕒 Dentro del Turno", int(resumen_turno_estados['Dentro_Del_Turno'].sum()))
+        ce3.metric("✅ Finalizadas", int(resumen_turno_estados['Finalizadas'].sum()))
+        ce4.metric("❌ Canceladas", int(resumen_turno_estados['Canceladas'].sum()))
+        ce5.metric("⏸️ Suspendidas", int(resumen_turno_estados['Suspendidas'].sum()))
+        ce6.metric("🚫 No Realizadas / Pend.", int(resumen_turno_estados['No_Realizadas'].sum() + resumen_turno_estados['Pendientes'].sum()))
+
+        st.dataframe(
+            resumen_turno_estados,
+            column_config={
+                "Zona_Oficial": "Zona",
+                "Turno_Detectado_Dia": "Turno Oficial Detectado",
+                "Total_Ordenes": "Total Órdenes",
+                "Dentro_Del_Turno": "En Turno",
+                "Post_Turno_Reactivadas": "Post-Turno",
+                "Finalizadas": "✅ Finalizadas",
+                "Canceladas": "❌ Canceladas",
+                "Suspendidas": "⏸️ Suspendidas",
+                "No_Realizadas": "🚫 No Realizadas",
+                "Pendientes": "⏳ Pendientes"
+            },
+            use_container_width=True,
+            hide_index=True
+        )
+
     df_xray_bloques = build_continuous_shift_xray(df_dia_xray, umbral_bache_min=float(umbral_bache))
 
     if not df_xray_bloques.empty:
-        # Resumen rápido en tarjetas de lo que pasó en esa selección de Rayos X
+        st.markdown("###### 🕒 Desglose de Tiempos del Turno (Ruta, Terreno, Tiempos Muertos y Post-Turno)")
         min_ruta_x = df_xray_bloques[df_xray_bloques['Tipo_Bloque'] == "🟦 Desplazamiento / En Ruta"]['Minutos_Bloque'].sum()
         min_terr_x = df_xray_bloques[df_xray_bloques['Tipo_Bloque'] == "🟩 Tiempo Operativo en Terreno (En el Daño)"]['Minutos_Bloque'].sum()
         min_muerto_x = df_xray_bloques[df_xray_bloques['Tipo_Bloque'] == "🟧 Tiempo Muerto / Bache Sin Actividad (>= 5m)"]['Minutos_Bloque'].sum()
@@ -1685,7 +1756,6 @@ with tab_tiempos:
         cx3.metric("🟧 Total Tiempo Muerto / Baches (>=5m)", f"{min_muerto_x:.0f} min ({min_muerto_x/60:.1f} h)")
         cx4.metric("🟪 Total Tiempo Extendido / Post-Turno", f"{min_extra_x:.0f} min ({min_extra_x/60:.1f} h)")
 
-        # Gráfico de Barra Cronológica Continua (Rayos X)
         fig_xray = px.timeline(
             df_xray_bloques.sort_values(by=['Recurso', 'DT_Start']),
             x_start='DT_Start',
