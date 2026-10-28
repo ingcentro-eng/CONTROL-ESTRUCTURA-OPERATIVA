@@ -126,66 +126,66 @@ st.markdown("""
 # 3. MAESTRO OFICIAL DE RECURSOS, SECTORES, ZONAS Y REGLAS DE TURNO
 # -----------------------------------------------------------------------------
 MAESTRO_ZONAS = {
-    "BOLG-332": ("CENTRO", "IBAGUE URBANA"),
-    "BOLM-301": ("CENTRO", "IBAGUE RURAL"),
-    "BOLM-302": ("CENTRO", "IBAGUE RURAL"),
-    "BOLM-308": ("CENTRO", "ROVIRA"),
-    "BOLM-309": ("CENTRO", "SAN JUAN DE LA CHINA"),
-    "BOLM-310": ("CENTRO", "SAN LUIS"),
-    "BOLM-311": ("CENTRO", "VALLE DE SAN JUAN"),
-    "BOLM-313": ("CENTRO", "PIEDRAS"),
-    "BOLM-330": ("CENTRO", "IBAGUE RURAL"),
-    "BOLM-348": ("CENTRO", "IBAGUE URBANA"),
-    "BOLM-353": ("CENTRO", "CAJAMARCA"),
-    "BOLV-303": ("CENTRO", "CAJAMARCA"),
-    "BOLV-304": ("CENTRO", "PAYANDE"),
-    "BOLV-307": ("CENTRO", "ROVIRA"),
-    "BOLV-312": ("CENTRO", "ALVARADO"),
-    "BOLV-330": ("CENTRO", "IBAGUE URBANA"),
-    "BOLV-333": ("CENTRO", "IBAGUE URBANA"),
-    "BOLV-336": ("CENTRO", "IBAGUE URBANA"),
-    "BOLV-337": ("CENTRO", "IBAGUE RURAL"),
-    "BOLV-394": ("CENTRO", "IBAGUE URBANA"),
-    "BOLV-397": ("CENTRO", "IBAGUE URBANA"),
-    "BOLV-398": ("CENTRO", "IBAGUE URBANA"),
-    "BOLV-399": ("CENTRO", "IBAGUE URBANA"),
-    "BOLE-990": ("CENTRO", "CENTRO"),
-    "BOLE-999": ("NORTE", "NORTE"),
-    "BOLV-365": ("NORTE", "HONDA"),
-    "BOLV-363": ("NORTE", "HONDA"),
-    "BOLV-396": ("NORTE", "MARIQUITA"),
-    "BOLV-366": ("NORTE", "MARIQUITA"),
-    "BOLV-368": ("NORTE", "MARIQUITA"),
-    "BOLV-372": ("NORTE", "LERIDA"),
-    "BOLV-360": ("NORTE", "VENADILLO"),
-    "BOLV-317": ("NORTE", "FRESNO"),
-    "BOLM-314": ("NORTE", "CASABIANCA"),
-    "BOLM-315": ("NORTE", "FALAN"),
-    "BOLM-316": ("NORTE", "FRESNO"),
-    "BOLM-318": ("NORTE", "HERVEO"),
-    "BOLM-319": ("NORTE", "PADUA"),
-    "BOLM-321": ("NORTE", "AMBALEMA"),
-    "BOLM-371": ("NORTE", "LERIDA"),
-    "BOLM-369": ("NORTE", "LIBANO"),
+    "BOLG-332": ("CENTRO", "IBAGUE URBANA"),  #[cite: 1]
+    "BOLM-301": ("CENTRO", "IBAGUE RURAL"),  #[cite: 1]
+    "BOLM-302": ("CENTRO", "IBAGUE RURAL"),  #[cite: 1]
+    "BOLM-308": ("CENTRO", "ROVIRA"),  #[cite: 1]
+    "BOLM-309": ("CENTRO", "SAN JUAN DE LA CHINA"),  #[cite: 1]
+    "BOLM-310": ("CENTRO", "SAN LUIS"),  #[cite: 1]
+    "BOLM-311": ("CENTRO", "VALLE DE SAN JUAN"),  #[cite: 1]
+    "BOLM-313": ("CENTRO", "PIEDRAS"),  #[cite: 1]
+    "BOLM-330": ("CENTRO", "IBAGUE RURAL"),  #[cite: 1]
+    "BOLM-348": ("CENTRO", "IBAGUE URBANA"),  #[cite: 1]
+    "BOLM-353": ("CENTRO", "CAJAMARCA"),  #[cite: 1]
+    "BOLV-303": ("CENTRO", "CAJAMARCA"),  #[cite: 1]
+    "BOLV-304": ("CENTRO", "PAYANDE"),  #[cite: 1]
+    "BOLV-307": ("CENTRO", "ROVIRA"),  #[cite: 1]
+    "BOLV-312": ("CENTRO", "ALVARADO"),  #[cite: 1]
+    "BOLV-330": ("CENTRO", "IBAGUE URBANA"),  #[cite: 1]
+    "BOLV-333": ("CENTRO", "IBAGUE URBANA"),  #[cite: 1]
+    "BOLV-336": ("CENTRO", "IBAGUE URBANA"),  #[cite: 1]
+    "BOLV-337": ("CENTRO", "IBAGUE RURAL"),  #[cite: 1]
+    "BOLV-394": ("CENTRO", "IBAGUE URBANA"),  #[cite: 1]
+    "BOLV-397": ("CENTRO", "IBAGUE URBANA"),  #[cite: 1]
+    "BOLV-398": ("CENTRO", "IBAGUE URBANA"),  #[cite: 1]
+    "BOLV-399": ("CENTRO", "IBAGUE URBANA"),  #[cite: 1]
+    "BOLE-990": ("CENTRO", "CENTRO"),  #[cite: 1]
+    "BOLE-999": ("NORTE", "NORTE"),  #[cite: 1]
+    "BOLV-365": ("NORTE", "HONDA"),  #[cite: 1]
+    "BOLV-363": ("NORTE", "HONDA"),  #[cite: 1]
+    "BOLV-396": ("NORTE", "MARIQUITA"),  #[cite: 1]
+    "BOLV-366": ("NORTE", "MARIQUITA"),  #[cite: 1]
+    "BOLV-368": ("NORTE", "MARIQUITA"),  #[cite: 1]
+    "BOLV-372": ("NORTE", "LERIDA"),  #[cite: 1]
+    "BOLV-360": ("NORTE", "VENADILLO"),  #[cite: 1]
+    "BOLV-317": ("NORTE", "FRESNO"),  #[cite: 1]
+    "BOLM-314": ("NORTE", "CASABIANCA"),  #[cite: 1]
+    "BOLM-315": ("NORTE", "FALAN"),  #[cite: 1]
+    "BOLM-316": ("NORTE", "FRESNO"),  #[cite: 1]
+    "BOLM-318": ("NORTE", "HERVEO"),  #[cite: 1]
+    "BOLM-319": ("NORTE", "PADUA"),  #[cite: 1]
+    "BOLM-321": ("NORTE", "AMBALEMA"),  #[cite: 1]
+    "BOLM-371": ("NORTE", "LERIDA"),  #[cite: 1]
+    "BOLM-369": ("NORTE", "LIBANO"),  #[cite: 1]
     "BOLV-370": ("NORTE", "LIBANO"),
-    "BOLM-322": ("NORTE", "ANZOATEGUI"),
-    "BOLM-324": ("NORTE", "JUNIN"),
-    "BOLM-320": ("NORTE", "PALOCABILDO"),
-    "BOLM-323": ("NORTE", "PALOCABILDO"),
-    "BOLM-361": ("NORTE", "GUAYABAL"),
-    "BOLM-362": ("NORTE", "GUAYABAL"),
-    "BOLM-325": ("NORTE", "SANTA ISABEL"),
-    "BOLM-326": ("NORTE", "LIBANO"),
-    "BOLM-327": ("NORTE", "MURILLO"),
-    "BOLM-328": ("NORTE", "SANTA TERESA"),
-    "BOLM-329": ("NORTE", "VILLAHERMOSA"),
-    "BOLM-350": ("NORTE", "MARIQUITA")
+    "BOLM-322": ("NORTE", "ANZOATEGUI"),  #[cite: 1]
+    "BOLM-324": ("NORTE", "JUNIN"),  #[cite: 1]
+    "BOLM-320": ("NORTE", "PALOCABILDO"),  #[cite: 1]
+    "BOLM-323": ("NORTE", "PALOCABILDO"),  #[cite: 1]
+    "BOLM-361": ("NORTE", "GUAYABAL"),  #[cite: 1]
+    "BOLM-362": ("NORTE", "GUAYABAL"),  #[cite: 1]
+    "BOLM-325": ("NORTE", "SANTA ISABEL"),  #[cite: 1]
+    "BOLM-326": ("NORTE", "LIBANO"),  #[cite: 1]
+    "BOLM-327": ("NORTE", "MURILLO"),  #[cite: 1]
+    "BOLM-328": ("NORTE", "SANTA TERESA"),  #[cite: 1]
+    "BOLM-329": ("NORTE", "VILLAHERMOSA"),  #[cite: 1]
+    "BOLM-350": ("NORTE", "MARIQUITA")  #[cite: 1]
 }
 
-ROTATIVAS_3T_CENTRO = {"BOLG-332", "BOLV-330", "BOLV-333", "BOLV-336", "BOLV-394", "BOLV-397", "BOLV-399"}
-ROTATIVAS_2T_NORTE = {"BOLV-363", "BOLV-365"}
-ROTATIVAS_3T_NORTE = {"BOLV-366", "BOLV-368", "BOLV-396"}
-BOLE_ESPECIALES = {"BOLE-990", "BOLE-999"}
+ROTATIVAS_3T_CENTRO = {"BOLG-332", "BOLV-330", "BOLV-333", "BOLV-336", "BOLV-394", "BOLV-397", "BOLV-399"}  #[cite: 1]
+ROTATIVAS_2T_NORTE = {"BOLV-363", "BOLV-365"}  #[cite: 1]
+ROTATIVAS_3T_NORTE = {"BOLV-366", "BOLV-368", "BOLV-396"}  #[cite: 1]
+BOLE_ESPECIALES = {"BOLE-990", "BOLE-999"}  #[cite: 1]
 
 MESES_ES = {
     1: "01 - Enero", 2: "02 - Febrero", 3: "03 - Marzo", 4: "04 - Abril",
@@ -210,8 +210,16 @@ COLORES_CAUSAS = {
     "🔍 Operación / Sin Causa Explícita": "#94a3b8"
 }
 
+COLORES_RAYOS_X = {
+    "🟦 Desplazamiento / En Ruta": "#3b82f6",
+    "🟩 Tiempo Operativo en Terreno (En el Daño)": "#10b981",
+    "🟧 Tiempo Muerto / Bache Sin Actividad (>= 5m)": "#f97316",
+    "🟨 Rutina / Alimentación / Charla SST": "#eab308",
+    "🟪 Tiempo Extendido / Post-Turno (Extra)": "#7c3aed"
+}
+
 # -----------------------------------------------------------------------------
-# 4. FUNCIONES DE LECTURA Y PROCESAMIENTO
+# 4. FUNCIONES DE LECTURA Y PROCESAMIENTO (INTACTO)
 # -----------------------------------------------------------------------------
 def convert_time_to_minutes(time_val):
     if pd.isna(time_val):
@@ -237,6 +245,13 @@ def hour_str_to_min_of_day(val):
     if m:
         return int(m.group(1)) * 60 + int(m.group(2))
     return np.nan
+
+
+def min_of_day_to_hhmm(m_val):
+    if pd.isna(m_val):
+        return "--:--"
+    m_int = int(round(float(m_val))) % 1440
+    return f"{m_int // 60:02d}:{m_int % 60:02d}"
 
 
 def parse_google_drive_url(url: str) -> str:
@@ -269,9 +284,9 @@ def normalize_recurso_key(recurso_str: str) -> str:
 def get_shift_profile(recurso_base: str):
     if recurso_base in BOLE_ESPECIALES:
         return ("L-V 07:30-16:30 (Enlace CELSIA)", "FIJO_BOLE", 7*60+30, 16*60+30, 8.0)
-    if recurso_base == "BOLV-398":
+    if recurso_base == "BOLV-398":  #[cite: 1]
         return ("Fijo 08:00-16:00 (7h netas)", "FIJO", 8*60, 16*60, 7.0)
-    if recurso_base in {"BOLM-348", "BOLM-353"}:
+    if recurso_base in {"BOLM-348", "BOLM-353"}:  #[cite: 1]
         return ("Fijo 09:00-17:00 (7h netas)", "FIJO", 9*60, 17*60, 7.0)
     if recurso_base in ROTATIVAS_3T_CENTRO:
         return ("Rotativo 3T Urbano (6-14 / 14-22 / 22-6)", "ROTATIVO_3T", None, None, 8.0)
@@ -308,9 +323,177 @@ def infer_daily_shift_window(tipo_turno, min_ini_fijo, min_fin_fijo, mins_inicio
     return 7*60, 15*60, "07:00 a 15:00"
 
 
+def build_continuous_shift_xray(df_day_all: pd.DataFrame, umbral_bache_min: float = 5.0):
+    """
+    Construye la Barra Cronológica Continua del Turno (Rayos X de la Jornada)
+    desglosando para cada brigada y fecha:
+    1) 🟦 Desplazamiento / En Ruta
+    2) 🟩 Tiempo Operativo en Terreno (En el Daño)
+    3) 🟨 Rutina / Alimentación / Charla SST
+    4) 🟪 Tiempo Extendido / Post-Turno (Extra)
+    5) 🟧 Tiempo Muerto / Bache Sin Actividad (>= umbral_bache_min)
+    """
+    bloques = []
+    if df_day_all.empty:
+        return pd.DataFrame()
+
+    for (rec, f_str), grp in df_day_all.groupby(['Recurso', 'Fecha_Str']):
+        rec_b = grp['Recurso_Base'].iloc[0]
+        zona_of = grp['Zona_Oficial'].iloc[0]
+        _, t_turno, m_ini_fijo, m_fin_fijo, _ = get_shift_profile(rec_b)
+        w_ini, w_fin, label_turno = infer_daily_shift_window(
+            t_turno, m_ini_fijo, m_fin_fijo, grp['Ini_Min_Dia'].tolist()
+        )
+        # Limitar ventana diurna estándar para trazado en el día
+        w_fin_dia = min(w_fin, 1439)
+
+        # Filtrar filas que tienen hora de Inicio y Finalización válidas
+        valid_rows = grp.dropna(subset=['Ini_Min_Dia', 'Fin_Min_Dia']).copy()
+        if valid_rows.empty:
+            continue
+
+        eventos_reales = []
+        for _, r in valid_rows.iterrows():
+            ini_sitio = float(r['Ini_Min_Dia'])
+            fin_sitio = float(r['Fin_Min_Dia'])
+            if fin_sitio < ini_sitio:
+                fin_sitio = 1439.0
+            viaje_m = float(r.get('Minutos_Viaje', 0.0))
+            ini_viaje = max(0.0, ini_sitio - viaje_m)
+            sub_act = str(r.get('Subtipo_Actividad', ''))
+            ot_code = str(r.get('Orden_Trabajo', 'Sin OT'))
+            id_act = str(r.get('ID_Actividad', ''))
+            obs_txt = str(r.get('Observaciones', ''))
+            es_rutina = (r.get('Categoria_Labor') == 'Rutina / Administrativa')
+
+            # Bloque de Viaje (si aplica)
+            if viaje_m >= 1.0 and ini_sitio > ini_viaje:
+                eventos_reales.append({
+                    'min_start': ini_viaje,
+                    'min_end': ini_sitio,
+                    'tipo_bloque': "🟦 Desplazamiento / En Ruta",
+                    'detalle': f"Viaje hacia {ot_code} ({sub_act})",
+                    'orden': ot_code,
+                    'id_act': id_act,
+                    'obs': obs_txt
+                })
+
+            # Bloque de Ejecución en Sitio / Rutina / Post-Turno
+            dur_visual = max(1.0, fin_sitio - ini_sitio)
+            fin_sitio_adj = ini_sitio + dur_visual
+
+            if es_rutina:
+                t_blq = "🟨 Rutina / Alimentación / Charla SST"
+            elif ini_sitio >= w_fin_dia:
+                t_blq = "🟪 Tiempo Extendido / Post-Turno (Extra)"
+            else:
+                t_blq = "🟩 Tiempo Operativo en Terreno (En el Daño)"
+
+            # Si una orden operativa cruza exactamente el fin de turno (w_fin_dia), partir en Terreno + Post-Turno
+            if (not es_rutina) and (ini_sitio < w_fin_dia) and (fin_sitio_adj > w_fin_dia):
+                eventos_reales.append({
+                    'min_start': ini_sitio,
+                    'min_end': float(w_fin_dia),
+                    'tipo_bloque': "🟩 Tiempo Operativo en Terreno (En el Daño)",
+                    'detalle': f"{sub_act} ({ot_code}) - En Turno",
+                    'orden': ot_code,
+                    'id_act': id_act,
+                    'obs': obs_txt
+                })
+                eventos_reales.append({
+                    'min_start': float(w_fin_dia),
+                    'min_end': fin_sitio_adj,
+                    'tipo_bloque': "🟪 Tiempo Extendido / Post-Turno (Extra)",
+                    'detalle': f"{sub_act} ({ot_code}) - Tiempo Extendido",
+                    'orden': ot_code,
+                    'id_act': id_act,
+                    'obs': obs_txt
+                })
+            else:
+                eventos_reales.append({
+                    'min_start': ini_sitio,
+                    'min_end': fin_sitio_adj,
+                    'tipo_bloque': t_blq,
+                    'detalle': f"{sub_act} ({ot_code})",
+                    'orden': ot_code,
+                    'id_act': id_act,
+                    'obs': obs_txt
+                })
+
+        if not eventos_reales:
+            continue
+
+        # Ordenar cronológicamente por minuto de inicio
+        eventos_reales = sorted(eventos_reales, key=lambda x: (x['min_start'], x['min_end']))
+
+        # Cursor desde el inicio oficial del turno (o primera actividad si empezó antes)
+        cursor = float(min(w_ini, eventos_reales[0]['min_start']))
+
+        secuencia_completa = []
+        for ev in eventos_reales:
+            s_m = ev['min_start']
+            e_m = ev['min_end']
+
+            # Si hay un hueco >= umbral_bache_min dentro del horario de turno antes del evento actual
+            if s_m > cursor:
+                fin_hueco = min(s_m, float(w_fin_dia))
+                if fin_hueco - cursor >= umbral_bache_min:
+                    secuencia_completa.append({
+                        'min_start': cursor,
+                        'min_end': fin_hueco,
+                        'tipo_bloque': "🟧 Tiempo Muerto / Bache Sin Actividad (>= 5m)",
+                        'detalle': f"⚠️ Bache sin actividad ({int(round(fin_hueco - cursor))} min)",
+                        'orden': "SIN ACTIVIDAD ACTIVA",
+                        'id_act': "-",
+                        'obs': f"Ventana sin viaje ni maniobra de {min_of_day_to_hhmm(cursor)} a {min_of_day_to_hhmm(fin_hueco)}"
+                    })
+
+            secuencia_completa.append(ev)
+            cursor = max(cursor, e_m)
+
+        # Si terminó su última actividad antes del fin oficial de su turno, agregar el bache final hasta el cierre de turno
+        if cursor < float(w_fin_dia) and (float(w_fin_dia) - cursor) >= umbral_bache_min:
+            secuencia_completa.append({
+                'min_start': cursor,
+                'min_end': float(w_fin_dia),
+                'tipo_bloque': "🟧 Tiempo Muerto / Bache Sin Actividad (>= 5m)",
+                'detalle': f"⚠️ Bache final hasta cierre de turno ({int(round(w_fin_dia - cursor))} min)",
+                'orden': "SIN ACTIVIDAD ACTIVA",
+                'id_act': "-",
+                'obs': f"Sin actividades reportadas desde {min_of_day_to_hhmm(cursor)} hasta fin de turno ({min_of_day_to_hhmm(w_fin_dia)})"
+            })
+
+        # Convertir cada bloque a Datetime para Plotly Timeline
+        base_dt = pd.to_datetime(f_str)
+        for item in secuencia_completa:
+            dur_m = round(item['min_end'] - item['min_start'], 1)
+            if dur_m <= 0:
+                continue
+            dt_s = base_dt + pd.Timedelta(minutes=float(item['min_start']))
+            dt_e = base_dt + pd.Timedelta(minutes=float(item['min_end']))
+            bloques.append({
+                'Recurso': rec,
+                'Zona_Oficial': zona_of,
+                'Fecha_Str': f_str,
+                'Turno_Dia': label_turno,
+                'Tipo_Bloque': item['tipo_bloque'],
+                'Hora_Inicio_Bloque': min_of_day_to_hhmm(item['min_start']),
+                'Hora_Fin_Bloque': min_of_day_to_hhmm(item['min_end']),
+                'Minutos_Bloque': dur_m,
+                'Detalle_Evento': item['detalle'],
+                'Orden_Trabajo': item['orden'],
+                'ID_Actividad': item['id_act'],
+                'Observaciones': item['obs'],
+                'DT_Start': dt_s,
+                'DT_End': dt_e
+            })
+
+    return pd.DataFrame(bloques)
+
+
 def classify_urban_vs_rural(row):
     zona_of = str(row.get('Zona_Oficial', '')).upper()
-    if zona_of == "IBAGUE URBANA":
+    if zona_of == "IBAGUE URBANA":  #[cite: 1]
         return "🏙️ Ibagué Casco Urbano"
     
     txt = f"{row.get('Dirección', '')} {row.get('Descripcion_Orden', '')} {row.get('Observaciones', '')}".upper()
@@ -327,7 +510,7 @@ def classify_urban_vs_rural(row):
         return "🏘️ Casco Urbano Municipio"
     if is_rural:
         return "🌲 Zona Veredal / Rural"
-    if zona_of == "IBAGUE RURAL":
+    if zona_of == "IBAGUE RURAL":  #[cite: 1]
         return "🌲 Zona Veredal / Rural"
     return "📍 General Municipio"
 
@@ -420,7 +603,6 @@ def detect_root_causes_multicausal(row):
 
 
 def classify_labor_tecnica(row):
-    """Clasifica el tipo de labor técnica ejecutada en sitio basada en los textos."""
     textos = [
         str(row.get('Observaciones', '')),
         str(row.get('Comentarios_Suspension', '')),
@@ -964,7 +1146,7 @@ else:
     efectividad_global = (fin_act / total_act * 100.0) if total_act > 0 else 0.0
 
 prom_viaje_global = df_f['Minutos_Viaje'].mean() if total_act > 0 else 0.0
-prom_faena_global = df_f['Minutos_Duracion'].mean() if total_act > 0 else 0.0
+prom_terreno_global = df_f['Minutos_Duracion'].mean() if total_act > 0 else 0.0
 
 brigadas_activas = df_f['Recurso'].nunique()
 dias_unicos = df_f['Fecha_Str'].nunique()
@@ -983,7 +1165,7 @@ rec_stats = df_f.groupby(['Recurso', 'Sector', 'Zona_Oficial', 'Regla_Horario', 
     Eventos_Extension_A=('Clasificacion_Jornada', lambda x: (x == "⏱️ Caso A: Tiempo Extendido (Cruza Hora Fin de Turno)").sum()),
     Eventos_Reactivacion_B=('Clasificacion_Jornada', lambda x: (x == "🌙 Caso B: Reactivación Post-Turno (Inicia Después del Turno)").sum()),
     Prom_Viaje_Min=('Minutos_Viaje', 'mean'),
-    Prom_Faena_Min=('Minutos_Duracion', 'mean'),
+    Prom_Terreno_Min=('Minutos_Duracion', 'mean'),
     Prom_Reaccion_Min=('Minutos_Reaccion', 'mean'),
     Prom_Cola_EGAM_Min=('Minutos_Cola_EGAM', 'mean')
 ).reset_index()
@@ -1026,7 +1208,7 @@ rec_stats['Horas_Post_Turno'] = (rec_stats['Min_Post_Turno'] / 60.0).round(2)
 
 rec_stats['Horas_Sin_Atender'] = (rec_stats['Horas_Netas_Disponibles'] - rec_stats['Horas_En_Jornada']).apply(lambda x: max(0.0, round(x, 2)))
 rec_stats['Prom_Viaje_Min'] = rec_stats['Prom_Viaje_Min'].round(1)
-rec_stats['Prom_Faena_Min'] = rec_stats['Prom_Faena_Min'].round(1)
+rec_stats['Prom_Terreno_Min'] = rec_stats['Prom_Terreno_Min'].round(1)
 rec_stats['Prom_Reaccion_Min'] = rec_stats['Prom_Reaccion_Min'].fillna(0.0).round(1)
 rec_stats['Prom_Cola_EGAM_Min'] = rec_stats['Prom_Cola_EGAM_Min'].fillna(0.0).round(1)
 
@@ -1074,9 +1256,9 @@ with k3:
 with k4:
     st.markdown(f"""
     <div class="metric-card">
-        <div class="metric-title">Prom. Ruta / Faena</div>
-        <div class="metric-value">{prom_viaje_global:.0f}m / {prom_faena_global:.0f}m</div>
-        <div class="metric-sub">Viaje prom. vs Atención prom.</div>
+        <div class="metric-title">Ruta vs. Tiempo en Terreno</div>
+        <div class="metric-value">{prom_viaje_global:.0f}m / {prom_terreno_global:.0f}m</div>
+        <div class="metric-sub">Prom. Viaje vs. Prom. en el Daño</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1106,7 +1288,7 @@ if not rec_stats.empty:
         criticas_rojas = len(rec_stats[rec_stats['Efectividad_%'] < 50.0])
         st.markdown(f"""
         <div class="alert-standby">
-            ⚠️ <strong>Atención de Disponibilidad (Mayor Standby en Turno):</strong><br>
+            ⚠️ <strong>Atención de Disponibilidad (Mayor Tiempo Muerto / Standby en Turno):</strong><br>
             La brigada con más tiempo sin labor en su horario es <strong>{top_sb['Recurso']}</strong> ({top_sb['Zona_Oficial']} - {top_sb['Turno_Actual']}) 
             con <strong>{top_sb['Horas_Sin_Atender']:.2f} horas</strong> disponibles sin actividad 
             (Laboró {top_sb['Horas_En_Jornada']:.2f} h de {top_sb['Horas_Netas_Disponibles']:.1f} h netas). 
@@ -1143,8 +1325,8 @@ tab_brigadas, tab_post, tab_zonas, tab_labores, tab_tiempos, tab_nodos, tab_obs,
     "👷 Control Brigadas, Standby y Extras",
     "🌙 Auditoría Post-Turno y Casco Urbano",
     "🗺️ Desempeño Zonas Oficiales",
-    "🛠️ Labores Técnicas y Tiempos en Sitio",
-    "⏱️ Cola EGAM, Gantt y Disciplina WFM",
+    "🛠️ Labores y Tiempo Operativo en Terreno",
+    "⏱️ Rayos X del Turno, Cola EGAM y Disciplina",
     "⚡ Nodos Recurrentes y Radar de Causas",
     "🔍 Observaciones y EGAM/RPA",
     "📍 Mapa y Trazabilidad",
@@ -1156,7 +1338,7 @@ with tab_brigadas:
     col_b1, col_b2 = st.columns(2)
     
     with col_b1:
-        st.markdown("##### ⏳ Top 15 Brigadas con Mayor Tiempo Sin Atender en su Turno (Standby Puro)")
+        st.markdown("##### ⏳ Top 15 Brigadas con Mayor Tiempo Muerto / Standby en su Turno")
         df_top_sb = rec_stats.sort_values(by='Horas_Sin_Atender', ascending=False).head(15)
         fig_sb = px.bar(
             df_top_sb,
@@ -1193,11 +1375,12 @@ with tab_brigadas:
         else:
             st.info("No hay brigadas con tiempo extendido posterior a su turno en los filtros actuales.")
 
-    st.markdown("##### 📊 Matriz Integral por Brigada (Jornada Ordinaria vs. Standby vs. Horas Extendidas Post-Turno)")
+    st.markdown("##### 📊 Matriz Integral por Brigada (Jornada Ordinaria vs. Tiempo Muerto Standby vs. Horas Extendidas Post-Turno)")
     cols_show_brig = [
         'Recurso', 'Sector', 'Zona_Oficial', 'Regla_Horario', 'Turno_Actual',
         'Semaforo', 'Efectividad_%', 'Total_Asignadas', 'Finalizadas', 'Fin_Por_Dia',
         'Canceladas', 'Canc_EGAM', 'Canc_RPA', 'Suspendidas',
+        'Prom_Viaje_Min', 'Prom_Terreno_Min',
         'Horas_Netas_Disponibles', 'Horas_En_Jornada', 'Horas_Sin_Atender',
         'Horas_Post_Turno', 'Eventos_Extension_A', 'Eventos_Reactivacion_B',
         'Primer_Inicio', 'Ultimo_Fin'
@@ -1214,6 +1397,8 @@ with tab_brigadas:
             "Fin_Por_Dia": st.column_config.NumberColumn("Fin/Día", format="%.1f"),
             "Canc_EGAM": "Canc. EGAM",
             "Canc_RPA": "Canc. RPA",
+            "Prom_Viaje_Min": st.column_config.NumberColumn("Prom. Ruta", format="%.0f m"),
+            "Prom_Terreno_Min": st.column_config.NumberColumn("Prom. en Terreno", format="%.0f m"),
             "Horas_Netas_Disponibles": st.column_config.NumberColumn("Turno Neto", format="%.1f h"),
             "Horas_En_Jornada": st.column_config.NumberColumn("Hrs en Turno", format="%.2f h"),
             "Horas_Sin_Atender": st.column_config.NumberColumn("Hrs Standby", format="%.2f h"),
@@ -1286,7 +1471,7 @@ with tab_post:
             st.info("No se registran horas post-turno en la selección actual.")
 
     with col_p2:
-        df_muni_urb = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()
+        df_muni_urb = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()  #[cite: 1]
         if not df_muni_urb.empty:
             urb_cnt = df_muni_urb.groupby(['Zona_Oficial', 'Entorno_Ubicacion']).size().reset_index(name='Cantidad')
             fig_urb = px.bar(
@@ -1319,7 +1504,7 @@ with tab_post:
     with c_u2:
         solo_post_muni = st.checkbox("Ver únicamente avisos que superaron el horario de turno (Post-Turno / Extras)", value=False)
 
-    df_muni_view = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()
+    df_muni_view = df_f[df_f['Zona_Oficial'] != "IBAGUE URBANA"].copy()  #[cite: 1]
     if f_entorno == "Solo 🏘️ Casco Urbano Municipio":
         df_muni_view = df_muni_view[df_muni_view['Entorno_Ubicacion'] == "🏘️ Casco Urbano Municipio"]
     elif f_entorno == "Solo 🌲 Zona Veredal / Rural":
@@ -1347,11 +1532,11 @@ with tab_zonas:
         Finalizadas=('Estado_Actividad', lambda x: (x.str.lower() == 'finalizada').sum()),
         Canceladas=('Estado_Actividad', lambda x: (x.str.lower() == 'cancelada').sum()),
         Suspendidas=('Estado_Actividad', lambda x: (x.str.lower() == 'suspendida').sum()),
-        Horas_Viaje=('Minutos_Viaje', lambda x: round(x.sum() / 60.0, 2)),
-        Horas_Faena=('Minutos_Duracion', lambda x: round(x.sum() / 60.0, 2)),
+        Horas_En_Ruta=('Minutos_Viaje', lambda x: round(x.sum() / 60.0, 2)),
+        Horas_Operativas_Terreno=('Minutos_Duracion', lambda x: round(x.sum() / 60.0, 2)),
         Horas_Extras_Zona=('Minutos_Extra_PostTurno', lambda x: round(x.sum() / 60.0, 2)),
-        Prom_Viaje_Min=('Minutos_Viaje', lambda x: round(x.mean(), 1)),
-        Prom_Faena_Min=('Minutos_Duracion', lambda x: round(x.mean(), 1))
+        Prom_Ruta_Min=('Minutos_Viaje', lambda x: round(x.mean(), 1)),
+        Prom_Terreno_Min=('Minutos_Duracion', lambda x: round(x.mean(), 1))
     ).reset_index()
     zona_summary['Efectividad_%'] = ((zona_summary['Finalizadas'] / zona_summary['Total_Actividades'].replace(0, 1)) * 100.0).round(1)
     zona_summary = zona_summary.sort_values(by='Total_Actividades', ascending=False)
@@ -1370,55 +1555,55 @@ with tab_zonas:
         st.plotly_chart(fig_z_vol, use_container_width=True)
 
     with col_z2:
-        st.markdown("##### 🚗 Comparativa por Zona: Horas en Ruta vs. Horas en Faena vs. Horas Extras")
+        st.markdown("##### 🚗 Comparativa por Zona: Horas en Ruta vs. Horas Operativas en Terreno vs. Horas Extras")
         fig_z_time = px.bar(
             zona_summary,
             x='Zona_Oficial',
-            y=['Horas_Viaje', 'Horas_Faena', 'Horas_Extras_Zona'],
+            y=['Horas_En_Ruta', 'Horas_Operativas_Terreno', 'Horas_Extras_Zona'],
             barmode='group',
-            color_discrete_map={'Horas_Viaje': '#3b82f6', 'Horas_Faena': '#0f172a', 'Horas_Extras_Zona': '#7c3aed'}
+            color_discrete_map={'Horas_En_Ruta': '#3b82f6', 'Horas_Operativas_Terreno': '#0f172a', 'Horas_Extras_Zona': '#7c3aed'}
         )
         fig_z_time.update_layout(height=380, margin=dict(t=10, b=10, l=10, r=10), legend=dict(orientation="h", y=1.1))
         st.plotly_chart(fig_z_time, use_container_width=True)
 
     st.dataframe(zona_summary, use_container_width=True, hide_index=True)
 
-# ================= TAB 4: LABORES TÉCNICAS Y VALIDACIÓN DE 45 MINUTOS =================
+# ================= TAB 4: LABORES TÉCNICAS Y TIEMPO OPERATIVO EN TERRENO (45 MINUTOS) =================
 with tab_labores:
-    st.markdown("##### 🛠️ Validador de Tiempos en Sitio y Tipos de Labor Técnica Ejecutada")
-    st.caption("Estándar operativo: El tiempo de duración en sitio (faena) no debe superar los **45 minutos** en revisiones y maniobras estándar.")
+    st.markdown("##### 🛠️ Validador de Tiempo Operativo en Terreno (En el Daño) y Tipo de Labor Ejecutada")
+    st.caption("Estándar operativo: El **Tiempo Operativo en Terreno** desde que inicia la actividad hasta que la finaliza no debe superar los **45 minutos**.")
 
     df_lab = df_f[df_f['Categoria_Labor'] == 'Operativa (Daños / OT)'].copy()
     if not df_lab.empty:
-        # Evaluar cumplimiento del estándar de 45 minutos
-        df_lab['Cumple_Estandar_45m'] = df_lab['Minutos_Duracion'].apply(lambda x: "🟢 Óptimo (< 45 min)" if x <= 45 else "🔴 Excede Estándar (> 45 min)")
+        df_lab['Cumple_Estandar_45m'] = df_lab['Minutos_Duracion'].apply(lambda x: "🟢 Óptimo (<= 45 min)" if x <= 45 else "🔴 Excede Estándar (> 45 min)")
 
         col_l1, col_l2 = st.columns(2)
         with col_l1:
-            st.markdown("###### ⏱️ Tiempo Promedio en Sitio por Tipo de Labor Técnica")
+            st.markdown("###### ⏱️ Tiempo Operativo en Terreno Promedio por Tipo de Labor")
             labor_summary = df_lab.groupby('Labor_Tecnica').agg(
                 Cantidad=('ID_Actividad', 'count'),
-                Prom_Min_Sitio=('Minutos_Duracion', 'mean'),
-                Max_Min_Sitio=('Minutos_Duracion', 'max'),
+                Prom_Min_Terreno=('Minutos_Duracion', 'mean'),
+                Max_Min_Terreno=('Minutos_Duracion', 'max'),
                 Exceden_45m=('Minutos_Duracion', lambda x: (x > 45).sum())
-            ).reset_index().sort_values(by='Prom_Min_Sitio', ascending=False)
+            ).reset_index().sort_values(by='Prom_Min_Terreno', ascending=False)
 
             fig_lab = px.bar(
                 labor_summary,
-                x='Prom_Min_Sitio',
+                x='Prom_Min_Terreno',
                 y='Labor_Tecnica',
                 orientation='h',
-                text='Prom_Min_Sitio',
-                color='Prom_Min_Sitio',
+                text='Prom_Min_Terreno',
+                color='Prom_Min_Terreno',
                 color_continuous_scale='Sunset',
-                labels={'Prom_Min_Sitio': 'Minutos Promedio en Sitio', 'Labor_Tecnica': 'Tipo de Labor Técnica'}
+                labels={'Prom_Min_Terreno': 'Minutos Promedio en Terreno (En el Daño)', 'Labor_Tecnica': 'Tipo de Labor Técnica'}
             )
+            fig_lab.add_vline(x=45, line_dash="dash", line_color="#991b1b", annotation_text="Tope 45m")
             fig_lab.update_traces(texttemplate='%{text:.0f} min', textposition='outside')
             fig_lab.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=10, b=10, l=10, r=40))
             st.plotly_chart(fig_lab, use_container_width=True)
 
         with col_l2:
-            st.markdown("###### 📊 Distribución de Órdenes según Estándar de 45 Minutos")
+            st.markdown("###### 📊 Cumplimiento del Tope de 45 Minutos en Terreno")
             est_counts = df_lab['Cumple_Estandar_45m'].value_counts().reset_index()
             est_counts.columns = ['Estado Estándar', 'Total']
             fig_est_45 = px.pie(
@@ -1428,22 +1613,24 @@ with tab_labores:
                 hole=0.45,
                 color='Estado Estándar',
                 color_discrete_map={
-                    "🟢 Óptimo (< 45 min)": "#10b981",
+                    "🟢 Óptimo (<= 45 min)": "#10b981",
                     "🔴 Excede Estándar (> 45 min)": "#ef4444"
                 }
             )
+            fig_est_45.update_traces(textposition='inside', textinfo='percent+label+value')
             fig_est_45.update_layout(height=360, margin=dict(t=10, b=10, l=10, r=10), legend=dict(orientation="h", y=-0.1))
             st.plotly_chart(fig_est_45, use_container_width=True)
 
-        st.markdown("###### 📋 Detalle de Órdenes Operativas y Verificación del Estándar en Sitio")
+        st.markdown("###### 📋 Detalle de Órdenes Operativas y Tiempo Operativo en Terreno (En el Daño)")
         st.dataframe(
             df_lab[[
                 'Fecha_Str', 'Sector', 'Zona_Oficial', 'Recurso', 'Orden_Trabajo',
-                'ID_Actividad', 'Labor_Tecnica', 'Minutos_Duracion', 'Cumple_Estandar_45m',
-                'Nodos_Detectados', 'Causas_Raiz_Texto', 'Observaciones'
+                'ID_Actividad', 'Labor_Tecnica', 'Minutos_Viaje', 'Minutos_Duracion',
+                'Cumple_Estandar_45m', 'Nodos_Detectados', 'Causas_Raiz_Texto', 'Observaciones'
             ]],
             column_config={
-                "Minutos_Duracion": st.column_config.NumberColumn("Duración Sitio", format="%.0f min"),
+                "Minutos_Viaje": st.column_config.NumberColumn("Tiempo Ruta", format="%.0f min"),
+                "Minutos_Duracion": st.column_config.NumberColumn("Tiempo Operativo en Terreno", format="%.0f min"),
                 "Cumple_Estandar_45m": "Evaluación 45 min",
                 "Causas_Raiz_Texto": "Causas Detectadas",
                 "Observaciones": st.column_config.TextColumn("Observaciones del Recurso", width="large")
@@ -1452,11 +1639,107 @@ with tab_labores:
             hide_index=True
         )
     else:
-        st.info("No hay actividades operativas de daños u OT en la selección actual para evaluar las labores técnicas.")
+        st.info("No hay actividades operativas de daños u OT en la selección actual.")
 
-# ================= TAB 5: COLA EGAM, GANTT HORARIO Y DISCIPLINA WFM =================
+# ================= TAB 5: RAYOS X CONTINUO DEL TURNO (DESDE MINUTO 5), COLA EGAM Y DISCIPLINA WFM =================
 with tab_tiempos:
-    st.markdown("##### ⏳ Mejora A: Desglose de Demora — Cola de Despacho EGAM (Generación ➔ Asignación) vs. Reacción Brigada (Asignación ➔ Inicio)")
+    st.markdown("##### 🔬 Rayos X de la Jornada: Barra Cronológica Continua del Turno (De Inicio a Fin de Turno)")
+    st.caption(
+        "Visualiza qué hizo exactamente un recurso (o varios recursos) en un día específico desde que abrió turno hasta que cerró. "
+        "Todo vacío sin viaje ni atención de **5 minutos en adelante** se marca automáticamente en naranja como **🟧 Tiempo Muerto / Bache Sin Actividad**."
+    )
+
+    # Controles exclusivos para inspeccionar 1 solo día y 1 o varios recursos con total claridad
+    fechas_xray_disp = sorted(df_contexto_turno['Fecha_Str'].unique().tolist())
+    col_x1, col_x2, col_x3 = st.columns([1, 1.8, 1])
+    with col_x1:
+        sel_fecha_xray = st.selectbox("📅 1. Selecciona el Día a Auditar:", fechas_xray_disp, index=len(fechas_xray_disp)-1)
+    
+    df_dia_xray = df_contexto_turno[df_contexto_turno['Fecha_Str'] == sel_fecha_xray].copy()
+    recursos_xray_disp = sorted(df_dia_xray['Recurso'].unique().tolist())
+
+    with col_x2:
+        sel_recs_xray = st.multiselect(
+            "👷 2. Selecciona un Recurso (o varios para comparar) — Vacío = Todos:",
+            options=recursos_xray_disp,
+            default=recursos_xray_disp[:1] if len(recursos_xray_disp) == 1 else []
+        )
+    with col_x3:
+        umbral_bache = st.number_input("⏱️ Umbral Bache / Tiempo Muerto (min):", min_value=1, max_value=60, value=5, step=1)
+
+    if sel_recs_xray:
+        df_dia_xray = df_dia_xray[df_dia_xray['Recurso'].isin(sel_recs_xray)].copy()
+
+    df_xray_bloques = build_continuous_shift_xray(df_dia_xray, umbral_bache_min=float(umbral_bache))
+
+    if not df_xray_bloques.empty:
+        # Resumen rápido en tarjetas de lo que pasó en esa selección de Rayos X
+        min_ruta_x = df_xray_bloques[df_xray_bloques['Tipo_Bloque'] == "🟦 Desplazamiento / En Ruta"]['Minutos_Bloque'].sum()
+        min_terr_x = df_xray_bloques[df_xray_bloques['Tipo_Bloque'] == "🟩 Tiempo Operativo en Terreno (En el Daño)"]['Minutos_Bloque'].sum()
+        min_muerto_x = df_xray_bloques[df_xray_bloques['Tipo_Bloque'] == "🟧 Tiempo Muerto / Bache Sin Actividad (>= 5m)"]['Minutos_Bloque'].sum()
+        min_extra_x = df_xray_bloques[df_xray_bloques['Tipo_Bloque'] == "🟪 Tiempo Extendido / Post-Turno (Extra)"]['Minutos_Bloque'].sum()
+
+        cx1, cx2, cx3, cx4 = st.columns(4)
+        cx1.metric("🟦 Total Tiempo en Ruta", f"{min_ruta_x:.0f} min ({min_ruta_x/60:.1f} h)")
+        cx2.metric("🟩 Total Tiempo Operativo en Terreno", f"{min_terr_x:.0f} min ({min_terr_x/60:.1f} h)")
+        cx3.metric("🟧 Total Tiempo Muerto / Baches (>=5m)", f"{min_muerto_x:.0f} min ({min_muerto_x/60:.1f} h)")
+        cx4.metric("🟪 Total Tiempo Extendido / Post-Turno", f"{min_extra_x:.0f} min ({min_extra_x/60:.1f} h)")
+
+        # Gráfico de Barra Cronológica Continua (Rayos X)
+        fig_xray = px.timeline(
+            df_xray_bloques.sort_values(by=['Recurso', 'DT_Start']),
+            x_start='DT_Start',
+            x_end='DT_End',
+            y='Recurso',
+            color='Tipo_Bloque',
+            hover_name='Detalle_Evento',
+            hover_data={
+                'DT_Start': False,
+                'DT_End': False,
+                'Turno_Dia': True,
+                'Hora_Inicio_Bloque': True,
+                'Hora_Fin_Bloque': True,
+                'Minutos_Bloque': True,
+                'Orden_Trabajo': True,
+                'Observaciones': True
+            },
+            color_discrete_map=COLORES_RAYOS_X,
+            height=max(360, df_xray_bloques['Recurso'].nunique() * 34)
+        )
+        fig_xray.update_yaxes(autorange="reversed")
+        fig_xray.update_layout(
+            xaxis_title=f"Línea Horaria Continua del Día ({sel_fecha_xray})",
+            yaxis_title="Brigada / Recurso",
+            legend_title="Estado en el Turno",
+            legend=dict(orientation="h", y=1.12),
+            margin=dict(t=35, b=15, l=10, r=10)
+        )
+        st.plotly_chart(fig_xray, use_container_width=True)
+
+        with st.expander("📋 Ver Tabla Minuto a Minuto del Turno y Detalle de Baches / Tiempos Muertos", expanded=(len(sel_recs_xray) == 1)):
+            st.dataframe(
+                df_xray_bloques[[
+                    'Fecha_Str', 'Recurso', 'Zona_Oficial', 'Turno_Dia', 'Tipo_Bloque',
+                    'Hora_Inicio_Bloque', 'Hora_Fin_Bloque', 'Minutos_Bloque',
+                    'Orden_Trabajo', 'ID_Actividad', 'Detalle_Evento', 'Observaciones'
+                ]],
+                column_config={
+                    "Fecha_Str": "Fecha",
+                    "Turno_Dia": "Horario Oficial",
+                    "Tipo_Bloque": "Estado en el Turno",
+                    "Hora_Inicio_Bloque": "Inicio",
+                    "Hora_Fin_Bloque": "Fin",
+                    "Minutos_Bloque": st.column_config.NumberColumn("Duración (min)", format="%.0f min"),
+                    "Observaciones": st.column_config.TextColumn("Observaciones / Detalle del Bache", width="large")
+                },
+                use_container_width=True,
+                hide_index=True
+            )
+    else:
+        st.info("No hay actividades con hora de inicio y finalización para trazar los Rayos X en esta selección.")
+
+    st.markdown("---")
+    st.markdown("##### ⏳ Desglose de los 4 Tiempos en Cadena: Cola EGAM ➔ Reacción Brigada ➔ Ruta ➔ Tiempo Operativo en Terreno")
     col_t1, col_t2 = st.columns(2)
     
     with col_t1:
@@ -1469,11 +1752,11 @@ with tab_tiempos:
                 color='Sector',
                 orientation='h',
                 text='Prom_Cola_EGAM_Min',
-                title="🖥️ Tiempo Promedio en Cola EGAM Antes de Asignar (Minutos)",
+                title="🖥️ 1. Tiempo Promedio en Cola EGAM Antes de Asignar (Minutos)",
                 color_discrete_map={'CENTRO': '#0f172a', 'NORTE': '#2563eb'}
             )
             fig_cola.update_traces(texttemplate='%{text:.0f} m', textposition='outside')
-            fig_cola.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=35, b=10, l=10, r=40))
+            fig_cola.update_layout(yaxis=dict(autorange="reversed"), height=350, margin=dict(t=35, b=10, l=10, r=40))
             st.plotly_chart(fig_cola, use_container_width=True)
         else:
             st.info("No hay datos de Fecha de Generación vs. Asignación en la selección.")
@@ -1488,36 +1771,16 @@ with tab_tiempos:
                 color='Zona_Oficial',
                 orientation='h',
                 text='Prom_Reaccion_Min',
-                title="👷 Tiempo Promedio de Reacción de Brigada tras Asignación (Minutos)"
+                title="👷 2. Tiempo Promedio de Reacción de Brigada tras Asignación (Minutos)"
             )
             fig_reac.update_traces(texttemplate='%{text:.0f} m', textposition='outside')
-            fig_reac.update_layout(yaxis=dict(autorange="reversed"), height=360, margin=dict(t=35, b=10, l=10, r=40))
+            fig_reac.update_layout(yaxis=dict(autorange="reversed"), height=350, margin=dict(t=35, b=10, l=10, r=40))
             st.plotly_chart(fig_reac, use_container_width=True)
         else:
             st.info("No hay registros con diferencia horaria entre asignación e inicio.")
 
     st.markdown("---")
-    st.markdown("##### 📅 Mejora B: Diagrama de Gantt / Línea de Tiempo Horaria (Detector de Vacíos Operativos entre Orden y Orden)")
-    df_gantt = df_contexto_turno.dropna(subset=['DT_Inicio', 'DT_Fin']).copy()
-    if not df_gantt.empty:
-        fig_gantt = px.timeline(
-            df_gantt.sort_values(by='Recurso'),
-            x_start='DT_Inicio',
-            x_end='DT_Fin',
-            y='Recurso',
-            color='Subtipo_Actividad',
-            hover_name='Orden_Trabajo',
-            hover_data=['ID_Actividad', 'Estado_Actividad', 'Inicio', 'Finalización', 'Minutos_Viaje', 'Minutos_Duracion', 'Observaciones'],
-            height=max(420, df_gantt['Recurso'].nunique() * 24)
-        )
-        fig_gantt.update_yaxes(autorange="reversed")
-        fig_gantt.update_layout(margin=dict(t=15, b=15, l=10, r=10))
-        st.plotly_chart(fig_gantt, use_container_width=True)
-    else:
-        st.info("No hay horas de Inicio y Finalización válidas para construir el diagrama de Gantt.")
-
-    st.markdown("---")
-    st.markdown("##### 🛡️ Mejora C: Auditoría de Disciplina en el Aplicativo WFM y Rezagos Operativos")
+    st.markdown("##### 🛡️ Auditoría de Disciplina en el Aplicativo WFM y Rezagos Operativos")
     
     col_w1, col_w2 = st.columns(2)
     with col_w1:
@@ -1935,7 +2198,15 @@ with tab_datos:
         'Comentarios_Cancelacion', 'Comentarios_Suspension'
     ] if c in df_f.columns]
     
-    st.dataframe(df_f[cols_auditoria], use_container_width=True, hide_index=True)
+    st.dataframe(
+        df_f[cols_auditoria],
+        column_config={
+            "Minutos_Viaje": st.column_config.NumberColumn("Tiempo Ruta (min)", format="%.0f"),
+            "Minutos_Duracion": st.column_config.NumberColumn("Tiempo Operativo en Terreno (min)", format="%.0f")
+        },
+        use_container_width=True,
+        hide_index=True
+    )
     
     col_dl1, col_dl2 = st.columns(2)
     with col_dl1:
